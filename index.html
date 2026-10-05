@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1C2430">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>近い荷物</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#EEF1F3; --card:#FFFFFF; --ink:#1C2430; --sub:#5B6673; --line:#CBD2D9;
+  --sign:#FFC93C; --signInk:#1C2430; --go:#1E8A5A; --stop:#C8372D;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#141A21;--card:#1F2731;--ink:#E8ECF0;--sub:#97A3B0;--line:#33404D;}
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--sign);outline-offset:2px}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--ink);color:#fff}
+header h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.02em}
+#gps{font-size:13px;opacity:.85;font-variant-numeric:tabular-nums}
+#gps.bad{color:#FF9C8F;opacity:1}
+
+main{padding:12px 12px calc(84px + env(safe-area-inset-bottom,0px));max-width:640px;margin:0 auto}
+section{display:none}
+section.on{display:block}
+
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);z-index:1000}
+nav button{flex:1;border:0;background:none;padding:10px 0 12px;font-size:14px;font-weight:700;color:var(--sub)}
+nav button.on{color:var(--ink);box-shadow:inset 0 4px 0 var(--sign)}
+
+/* nearest */
+.near{background:var(--card);border-radius:14px;overflow:hidden;border:2px solid var(--ink)}
+.near .band{background:var(--sign);color:var(--signInk);padding:10px 14px;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.near .dist{font-size:44px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.near .dist small{font-size:20px;font-weight:700;margin-left:4px}
+.near .no{font-size:15px;font-weight:700}
+.near .body{padding:12px 14px 14px}
+.addr{font-size:18px;font-weight:700;word-break:break-all}
+.memo{margin-top:4px;color:var(--stop);font-weight:700}
+.pics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.pic{aspect-ratio:3/4;background:var(--bg);border-radius:8px;overflow:hidden;border:0;padding:0;position:relative}
+.pic img{width:100%;height:100%;object-fit:cover;display:block}
+.pic span{position:absolute;left:6px;bottom:6px;background:rgba(28,36,48,.8);color:#fff;font-size:12px;padding:2px 6px;border-radius:4px}
+.pic.none{display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:13px}
+.btn{display:block;width:100%;border:0;border-radius:10px;padding:14px;font-size:17px;font-weight:700}
+.btn.go{background:var(--go);color:#fff}
+.btn.ink{background:var(--ink);color:var(--card)}
+.btn.line{background:none;border:2px solid var(--line)}
+.btn.stop{background:none;border:2px solid var(--stop);color:var(--stop)}
+.btn:disabled{opacity:.45}
+
+h2{font-size:15px;color:var(--sub);margin:20px 2px 8px;font-weight:700}
+.row{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:10px;padding:8px;margin-bottom:6px;border:1px solid var(--line)}
+.row img,.row .ph{width:52px;height:52px;border-radius:6px;object-fit:cover;flex:none;background:var(--bg)}
+.row .t{flex:1;min-width:0}
+.row .a{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:13px;color:var(--sub)}
+.row .d{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.row .mini{border:1px solid var(--line);background:none;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:700}
+.empty{background:var(--card);border:2px dashed var(--line);border-radius:14px;padding:28px 18px;text-align:center;color:var(--sub)}
+
+/* register */
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shot{aspect-ratio:3/4;border:2px dashed var(--line);border-radius:10px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;font-weight:700;color:var(--sub);overflow:hidden;position:relative;padding:0}
+.shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.shot.has{border-style:solid;border-color:var(--ink)}
+.shot .ic{font-size:30px}
+label.f{display:block;font-size:14px;font-weight:700;color:var(--sub);margin:14px 2px 6px}
+.in{display:flex;gap:6px}
+.pre{flex:none;align-self:center;font-size:14px;color:var(--sub);max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+input[type=text],textarea{width:100%;border:2px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--card);font-size:16px}
+input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
+.in button{flex:none;border:0;border-radius:10px;background:var(--ink);color:var(--card);padding:0 14px;font-weight:700}
+#map{height:240px;border-radius:10px;margin-top:8px;border:2px solid var(--line);z-index:0}
+.cands button{display:block;width:100%;text-align:left;margin-top:6px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 10px;font-size:14px}
+.hint{font-size:13px;color:var(--sub);margin:6px 2px 0}
+.gap{height:10px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* overlays */
+#viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:2000;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#viewer.on{display:flex}
+#viewer img{max-width:100%;max-height:100%;object-fit:contain}
+#toast{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--card);border-radius:10px;padding:12px 14px;
+  display:none;align-items:center;justify-content:space-between;gap:10px;z-index:1500;max-width:616px;margin:0 auto;font-weight:700}
+#toast.on{display:flex}
+#toast button{border:0;background:var(--sign);color:var(--signInk);border-radius:8px;padding:6px 12px;font-weight:800}
+@media (prefers-reduced-motion:no-preference){
+  .near{animation:pop .25s ease-out}
+  @keyframes pop{from{transform:scale(.98);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>近い荷物</h1>
+  <div id="gps">位置を取得中…</div>
+</header>
+
+<main>
+  <!-- 配達 -->
+  <section id="tab-deliver" class="on">
+    <div id="deliverTop"></div>
+    <h2 id="nextTitle" hidden>次に近い荷物</h2>
+    <div id="deliverList"></div>
+  </section>
+
+  <!-- 登録 -->
+  <section id="tab-register">
+    <div class="shots">
+      <button class="shot" id="shotAddr" type="button"><span class="ic">📷</span>住所ラベル</button>
+      <button class="shot" id="shotPkg" type="button"><span class="ic">📦</span>荷物全体</button>
+    </div>
+    <input type="file" id="fileAddr" accept="image/*" capture="environment" hidden>
+    <input type="file" id="filePkg" accept="image/*" capture="environment" hidden>
+
+    <label class="f" for="addrIn">住所（丁目・番地まで）</label>
+    <div class="in">
+      <span class="pre" id="prefixShow"></span>
+      <input type="text" id="addrIn" placeholder="緑区橋本3-1-1" enterkeyhint="search" autocomplete="off">
+      <button type="button" id="searchBtn">探す</button>
+    </div>
+    <div class="cands" id="cands"></div>
+    <div id="map"></div>
+    <p class="hint" id="posHint">地図をタップするか、ピンを動かして位置を合わせてください。</p>
+    <div class="gap"></div>
+    <button class="btn line" type="button" id="hereBtn">今いる場所を届け先にする</button>
+
+    <label class="f" for="memoIn">メモ（任意）</label>
+    <input type="text" id="memoIn" placeholder="置き配OK・午前指定など" autocomplete="off">
+
+    <div class="gap"></div><div class="gap"></div>
+    <button class="btn ink" type="button" id="saveBtn">保存する</button>
+    <div class="gap"></div>
+    <button class="btn line" type="button" id="cancelEditBtn" hidden>編集をやめる</button>
+  </section>
+
+  <!-- 一覧 -->
+  <section id="tab-list">
+    <h2 id="pendTitle">未配達</h2>
+    <div id="pendList"></div>
+    <h2 id="doneTitle">配達済み</h2>
+    <div id="doneList"></div>
+
+    <h2>設定</h2>
+    <label class="f" for="prefixIn">住所の前に自動で付ける文字</label>
+    <input type="text" id="prefixIn" placeholder="神奈川県相模原市">
+    <p class="hint">よく回るエリアの市区町村まで入れておくと、登録時は丁目・番地だけで済みます。</p>
+    <div class="gap"></div><div class="gap"></div>
+    <div class="two">
+      <button class="btn line" type="button" id="clearDoneBtn">配達済みを削除</button>
+      <button class="btn stop" type="button" id="clearAllBtn">すべて削除</button>
+    </div>
+    <p class="hint" id="storageInfo"></p>
+  </section>
+</main>
+
+<nav>
+  <button type="button" data-tab="deliver" class="on">配達</button>
+  <button type="button" data-tab="register">登録</button>
+  <button type="button" data-tab="list">一覧</button>
+</nav>
+
+<div id="viewer"><img alt=""></div>
+<div id="toast"><span id="toastMsg"></span><button type="button" id="toastBtn" hidden>元に戻す</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* ---------- 設定 ---------- */
+const DEFAULT_CENTER = [35.5714, 139.3733]; // 相模原
+const NEAR_VIBRATE_M = 100;
+const ls = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+};
+let prefix = ls.get('prefix', '神奈川県相模原市');
+let counter = parseInt(ls.get('counter', '0'), 10) || 0;
+
+/* ---------- IndexedDB ---------- */
+const DBN = 'chikai-nimotsu', ST = 'parcels';
+let db;
+function openDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DBN, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(ST, { keyPath: 'id' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function req(mode, fn){
+  return new Promise((res, rej) => {
+    const q = fn(db.transaction(ST, mode).objectStore(ST));
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+}
+const dbAll = () => req('readonly', s => s.getAll());
+const dbPut = o => req('readwrite', s => s.put(o));
+const dbDel = id => req('readwrite', s => s.delete(id));
+
+/* ---------- 状態 ---------- */
+let parcels = [];
+let pos = null;           // {lat,lng,acc}
+let lastOrderKey = '';
+let lastTopId = null;
+const urlCache = new Map();
+function blobUrl(key, blob){
+  if (!blob) return null;
+  if (!urlCache.has(key)) urlCache.set(key, URL.createObjectURL(blob));
+  return urlCache.get(key);
+}
+function dropUrls(id){
+  for (const k of [id + ':a', id + ':p']) {
+    if (urlCache.has(k)) { URL.revokeObjectURL(urlCache.get(k)); urlCache.delete(k); }
+  }
+}
+
+/* ---------- 便利関数 ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function distM(a, b){
+  const R = 6371000, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*r) * Math.cos(b.lat*r) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function fmt(m){
+  if (m == null) return ['—', ''];
+  if (m < 1000) return [String(Math.round(m / 10) * 10), 'm'];
+  return [(m / 1000).toFixed(1), 'km'];
+}
+function toHalf(s){
+  return s.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+          .replace(/[－ー―‐−]/g, '-').replace(/　/g, ' ').trim();
+}
+function compress(file){
+  return new Promise((res, rej) => {
+    const u = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const max = 1280, s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(u);
+      c.toBlob(b => b ? res(b) : rej(new Error('圧縮に失敗しました')), 'image/jpeg', 0.75);
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('写真を読み込めませんでした')); };
+    img.src = u;
+  });
+}
+
+/* ---------- トースト ---------- */
+let toastTimer, toastUndo = null;
+function toast(msg, undo){
+  $('toastMsg').textContent = msg;
+  toastUndo = undo || null;
+  $('toastBtn').hidden = !undo;
+  $('toast').classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.remove('on'), undo ? 5000 : 2200);
+}
+$('toastBtn').onclick = async () => {
+  $('toast').classList.remove('on');
+  if (toastUndo) { const f = toastUndo; toastUndo = null; await f(); }
+};
+
+/* ---------- 写真ビューア ---------- */
+function openViewer(src){ if (!src) return; $('viewer').querySelector('img').src = src; $('viewer').classList.add('on'); }
+$('viewer').onclick = () => $('viewer').classList.remove('on');
+
+/* ---------- タブ ---------- */
+let currentTab = 'deliver';
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t){
+  currentTab = t;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('main section').forEach(s => s.classList.toggle('on', s.id === 'tab-' + t));
+  if (t === 'deliver') { lastOrderKey = ''; renderDeliver(); keepAwake(); }
+  if (t === 'register') { initMap(); setTimeout(() => map && map.invalidateSize(), 50); }
+  if (t === 'list') renderList();
+  window.scrollTo(0, 0);
+}
+
+/* ---------- 配達画面 ---------- */
+function sortedPending(){
+  const list = parcels.filter(p => !p.done).map(p => ({ p, d: pos ? distM(pos, p) : null }));
+  list.sort((a, b) => (a.d == null || b.d == null) ? a.p.no - b.p.no : a.d - b.d);
+  return list;
+}
+function renderDeliver(){
+  const list = sortedPending();
+  const key = list.map(x => x.p.id).join(',');
+  if (key === lastOrderKey && key) { updateDistances(list); return; }
+  lastOrderKey = key;
+
+  const top = $('deliverTop'), rest = $('deliverList');
+  if (!list.length) {
+    const any = parcels.length > 0;
+    top.innerHTML = `<div class="empty">${any
+      ? '<b>すべて配達しました。</b><br>明日の分は「一覧」で配達済みを削除してから登録してください。'
+      : '<b>荷物が登録されていません。</b><br>「登録」で住所ラベルと荷物の写真を撮って追加してください。'}</div>`;
+    rest.innerHTML = ''; $('nextTitle').hidden = true; lastTopId = null;
+    return;
+  }
+  const { p, d } = list[0];
+  const [n, u] = fmt(d);
+  const ua = blobUrl(p.id + ':a', p.photoAddr), up = blobUrl(p.id + ':p', p.photoPkg);
+  top.innerHTML = `
+    <div class="near">
+      <div class="band"><div class="dist" data-dist="${p.id}">${n}<small>${u}</small></div><div class="no">No.${p.no}</div></div>
+      <div class="body">
+        <div class="addr">${esc(p.addr)}</div>
+        ${p.memo ? `<div class="memo">${esc(p.memo)}</div>` : ''}
+        <div class="pics">
+          ${ua ? `<button class="pic" data-view="${ua}"><img src="${ua}" alt="住所ラベル"><span>住所ラベル</span></button>` : '<div class="pic none">住所写真なし</div>'}
+          ${up ? `<button class="pic" data-view="${up}"><img src="${up}" alt="荷物全体"><span>荷物全体</span></button>` : '<div class="pic none">荷物写真なし</div>'}
+        </div>
+        <button class="btn go" data-done="${p.id}">配達完了</button>
+      </div>
+    </div>`;
+
+  $('nextTitle').hidden = list.length < 2;
+  rest.innerHTML = list.slice(1).map(({ p, d }) => {
+    const [n, u] = fmt(d);
+    const ua = blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr);
+    return `<div class="row">
+      ${ua ? `<img src="${ua}" alt="" data-view="${ua}">` : '<div class="ph"></div>'}
+      <div class="t"><div class="a">${esc(p.addr)}</div><div class="s">No.${p.no}${p.memo ? ' / ' + esc(p.memo) : ''}</div></div>
+      <div class="d" data-dist="${p.id}">${n}${u}</div>
+    </div>`;
+  }).join('');
+
+  if (p.id !== lastTopId) {
+    if (lastTopId !== null && d != null && d < NEAR_VIBRATE_M && navigator.vibrate) navigator.vibrate(200);
+    lastTopId = p.id;
+  }
+}
+function updateDistances(list){
+  for (const { p, d } of list) {
+    const el = document.querySelector(`[data-dist="${p.id}"]`);
+    if (!el) continue;
+    const [n, u] = fmt(d);
+    el.innerHTML = el.classList.contains('dist') ? `${n}<small>${u}</small>` : `${n}${u}`;
+  }
+}
+document.addEventListener('click', async e => {
+  const v = e.target.closest('[data-view]');
+  if (v) { openViewer(v.dataset.view); return; }
+  const dn = e.target.closest('[data-done]');
+  if (dn) await markDone(dn.dataset.done, true);
+});
+async function markDone(id, done){
+  const p = parcels.find(x => x.id === id);
+  if (!p) return;
+  p.done = done; p.doneAt = done ? Date.now() : null;
+  await dbPut(p);
+  lastOrderKey = '';
+  renderDeliver(); if (currentTab === 'list') renderList();
+  if (done) toast(`No.${p.no} を配達済みにしました`, () => markDone(id, false));
+}
+
+/* ---------- GPS ---------- */
+function startGPS(){
+  if (!('geolocation' in navigator)) { setGps('この端末は位置情報に対応していません', true); return; }
+  navigator.geolocation.watchPosition(g => {
+    pos = { lat: g.coords.latitude, lng: g.coords.longitude, acc: g.coords.accuracy };
+    setGps(`GPS ±${Math.round(pos.acc)}m`, pos.acc > 100);
+    if (currentTab === 'deliver') renderDeliver();
+  }, err => {
+    setGps(err.code === 1 ? '位置情報が許可されていません' : '位置を取得できません', true);
+  }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 });
+}
+function setGps(t, bad){ $('gps').textContent = t; $('gps').classList.toggle('bad', !!bad); }
+
+/* ---------- 画面を消さない ---------- */
+let wakeLock = null;
+async function keepAwake(){
+  try { if ('wakeLock' in navigator && !wakeLock) {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } } catch(e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentTab === 'deliver') keepAwake();
+});
+
+/* ---------- 登録画面 ---------- */
+let map = null, marker = null;
+const form = { id: null, photoAddr: null, photoPkg: null, lat: null, lng: null };
+
+function initMap(){
+  if (map || typeof L === 'undefined') return;
+  map = L.map('map', { zoomControl: true }).setView(pos ? [pos.lat, pos.lng] : DEFAULT_CENTER, 16);
+  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>'
+  }).addTo(map);
+  map.on('click', e => setPin(e.latlng.lat, e.latlng.lng, true));
+}
+function setPin(lat, lng, keepZoom){
+  form.lat = lat; form.lng = lng;
+  if (!map) return;
+  if (!marker) {
+    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+    marker.on('dragend', () => { const ll = marker.getLatLng(); form.lat = ll.lat; form.lng = ll.lng; });
+  } else marker.setLatLng([lat, lng]);
+  map.setView([lat, lng], keepZoom ? map.getZoom() : 17);
+  $('posHint').textContent = '位置をセットしました。ずれていればピンを動かしてください。';
+}
+
+function showShot(which, blob){
+  const btn = which === 'a' ? $('shotAddr') : $('shotPkg');
+  const label = which === 'a' ? '<span class="ic">📷</span>住所ラベル' : '<span class="ic">📦</span>荷物全体';
+  btn.querySelector('img') && URL.revokeObjectURL(btn.querySelector('img').src);
+  if (blob) { btn.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="">`; btn.classList.add('has'); }
+  else { btn.innerHTML = label; btn.classList.remove('has'); }
+}
+$('shotAddr').onclick = () => $('fileAddr').click();
+$('shotPkg').onclick = () => $('filePkg').click();
+async function onFile(input, which){
+  const f = input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  try {
+    const b = await compress(f);
+    if (which === 'a') form.photoAddr = b; else form.photoPkg = b;
+    showShot(which, b);
+  } catch(e) { toast(e.message); }
+}
+$('fileAddr').onchange = e => onFile(e.target, 'a');
+$('filePkg').onchange = e => onFile(e.target, 'p');
+
+async function search(){
+  const raw = toHalf($('addrIn').value);
+  if (!raw) { toast('住所を入力してください'); return; }
+  const q = raw.startsWith(prefix) || /^(東京都|北海道|京都府|大阪府|.{2,3}県)/.test(raw) ? raw : prefix + raw;
+  $('searchBtn').disabled = true; $('cands').innerHTML = '';
+  try {
+    const r = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(q));
+    if (!r.ok) throw new Error();
+    const j = await r.json();
+    if (!j.length) { toast('見つかりませんでした。地図をタップして位置を指定してください'); return; }
+    const c = j.slice(0, 5).map(f => ({ lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], title: f.properties.title }));
+    setPin(c[0].lat, c[0].lng);
+    if (c.length > 1) {
+      $('cands').innerHTML = c.map((x, i) => `<button type="button" data-i="${i}">${i === 0 ? '✓ ' : ''}${esc(x.title)}</button>`).join('');
+      $('cands').querySelectorAll('button').forEach(b => b.onclick = () => {
+        const x = c[+b.dataset.i]; setPin(x.lat, x.lng);
+        $('cands').querySelectorAll('button').forEach((bb, i) => bb.textContent = (i === +b.dataset.i ? '✓ ' : '') + c[i].title);
+      });
+    }
+  } catch(e) {
+    toast('住所検索につながりません。電波を確認するか、地図をタップしてください');
+  } finally { $('searchBtn').disabled = false; }
+}
+$('searchBtn').onclick = search;
+$('addrIn').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); search(); } });
+$('hereBtn').onclick = () => {
+  if (!pos) { toast('現在地がまだ取れていません'); return; }
+  initMap(); setPin(pos.lat, pos.lng);
+};
+
+function resetForm(){
+  form.id = null; form.photoAddr = null; form.photoPkg = null; form.lat = null; form.lng = null;
+  showShot('a', null); showShot('p', null);
+  $('addrIn').value = ''; $('memoIn').value = ''; $('cands').innerHTML = '';
+  if (marker) { marker.remove(); marker = null; }
+  $('posHint').textContent = '地図をタップするか、ピンを動かして位置を合わせてください。';
+  $('saveBtn').textContent = '保存する'; $('cancelEditBtn').hidden = true;
+}
+$('cancelEditBtn').onclick = () => { resetForm(); showTab('list'); };
+
+$('saveBtn').onclick = async () => {
+  if (form.lat == null) { toast('届け先の位置を決めてください（探す・地図タップ・今いる場所）'); return; }
+  const addrTxt = toHalf($('addrIn').value);
+  const addr = addrTxt ? (addrTxt.startsWith(prefix) ? addrTxt.slice(prefix.length) : addrTxt) : '住所未入力';
+  if (form.id) {
+    const p = parcels.find(x => x.id === form.id);
+    Object.assign(p, { addr, memo: $('memoIn').value.trim(), lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg });
+    dropUrls(p.id); await dbPut(p);
+    toast(`No.${p.no} を更新しました`);
+    resetForm(); lastOrderKey = ''; showTab('list');
+    return;
+  }
+  counter += 1; ls.set('counter', String(counter));
+  const p = { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), no: counter, addr,
+    memo: $('memoIn').value.trim(), lat: form.lat, lng: form.lng,
+    photoAddr: form.photoAddr, photoPkg: form.photoPkg, done: false, createdAt: Date.now() };
+  await dbPut(p); parcels.push(p);
+  lastOrderKey = '';
+  toast(`No.${p.no} を保存しました（未配達 ${parcels.filter(x => !x.done).length}件）`);
+  resetForm(); window.scrollTo(0, 0);
+};
+
+function editParcel(id){
+  const p = parcels.find(x => x.id === id); if (!p) return;
+  showTab('register'); resetForm();
+  form.id = p.id; form.photoAddr = p.photoAddr; form.photoPkg = p.photoPkg;
+  showShot('a', p.photoAddr); showShot('p', p.photoPkg);
+  $('addrIn').value = p.addr === '住所未入力' ? '' : p.addr; $('memoIn').value = p.memo || '';
+  setTimeout(() => { map && map.invalidateSize(); setPin(p.lat, p.lng); }, 60);
+  $('saveBtn').textContent = `No.${p.no} を更新する`; $('cancelEditBtn').hidden = false;
+}
+
+/* ---------- 一覧・設定 ---------- */
+function renderList(){
+  const pend = parcels.filter(p => !p.done).sort((a, b) => a.no - b.no);
+  const done = parcels.filter(p => p.done).sort((a, b) => b.doneAt - a.doneAt);
+  $('pendTitle').textContent = `未配達 ${pend.length}件`;
+  $('doneTitle').textContent = `配達済み ${done.length}件`;
+  const row = (p, isDone) => {
+    const u = blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr);
+    return `<div class="row">
+      ${u ? `<img src="${u}" alt="" data-view="${u}">` : '<div class="ph"></div>'}
+      <div class="t"><div class="a">${esc(p.addr)}</div><div class="s">No.${p.no}${p.memo ? ' / ' + esc(p.memo) : ''}</div></div>
+      ${isDone ? `<button class="mini" data-undo="${p.id}">戻す</button>`
+               : `<button class="mini" data-edit="${p.id}">編集</button><button class="mini" data-del="${p.id}">削除</button>`}
+    </div>`;
+  };
+  $('pendList').innerHTML = pend.length ? pend.map(p => row(p, false)).join('') : '<p class="hint">未配達の荷物はありません。</p>';
+  $('doneList').innerHTML = done.length ? done.map(p => row(p, true)).join('') : '<p class="hint">まだありません。</p>';
+  storageInfo();
+}
+$('tab-list').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.edit) editParcel(b.dataset.edit);
+  if (b.dataset.undo) await markDone(b.dataset.undo, false);
+  if (b.dataset.del) {
+    const p = parcels.find(x => x.id === b.dataset.del);
+    if (!confirm(`No.${p.no}「${p.addr}」を削除しますか？`)) return;
+    await dbDel(p.id); dropUrls(p.id); parcels = parcels.filter(x => x.id !== p.id);
+    lastOrderKey = ''; renderList(); toast('削除しました');
+  }
+});
+$('clearDoneBtn').onclick = async () => {
+  const done = parcels.filter(p => p.done);
+  if (!done.length) { toast('配達済みの荷物はありません'); return; }
+  if (!confirm(`配達済み ${done.length}件を削除しますか？`)) return;
+  for (const p of done) { await dbDel(p.id); dropUrls(p.id); }
+  parcels = parcels.filter(p => !p.done);
+  if (!parcels.length) { counter = 0; ls.set('counter', '0'); }
+  lastOrderKey = ''; renderList(); toast('配達済みを削除しました');
+};
+$('clearAllBtn').onclick = async () => {
+  if (!parcels.length) { toast('登録された荷物はありません'); return; }
+  if (!confirm(`未配達を含む ${parcels.length}件をすべて削除します。よろしいですか？`)) return;
+  for (const p of parcels) { await dbDel(p.id); dropUrls(p.id); }
+  parcels = []; counter = 0; ls.set('counter', '0');
+  lastOrderKey = ''; renderList(); toast('すべて削除しました');
+};
+$('prefixIn').value = prefix;
+$('prefixIn').addEventListener('change', () => {
+  prefix = toHalf($('prefixIn').value); ls.set('prefix', prefix);
+  $('prefixShow').textContent = prefix; toast('保存しました');
+});
+async function storageInfo(){
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const e = await navigator.storage.estimate();
+      $('storageInfo').textContent = `使用容量 約${(e.usage / 1048576).toFixed(1)}MB`;
+    }
+  } catch(e) {}
+}
+
+/* ---------- 起動 ---------- */
+(async () => {
+  $('prefixShow').textContent = prefix;
+  try {
+    db = await openDB();
+    parcels = await dbAll();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  } catch(e) {
+    $('deliverTop').innerHTML = '<div class="empty"><b>保存領域を開けません。</b><br>プライベートブラウズを解除して開き直してください。</div>';
+    return;
+  }
+  renderDeliver();
+  startGPS();
+  keepAwake();
+})();
+})();
+</script>
+</body>
+</html>
