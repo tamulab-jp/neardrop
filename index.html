@@ -6,7 +6,9 @@
 <meta name="theme-color" content="#1C2430">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>近い荷物</title>
+<title>NearDrop</title>
+<meta name="apple-mobile-web-app-title" content="NearDrop">
+<meta name="application-name" content="NearDrop">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{
@@ -26,8 +28,10 @@ body{background:var(--bg);color:var(--ink);
 button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--sign);outline-offset:2px}
+[hidden]{display:none !important}
 
 header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--ink);color:#fff}
+@media (prefers-color-scheme:dark){header{background:#0E1318}}
 header h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.02em}
 #gps{font-size:13px;opacity:.85;font-variant-numeric:tabular-nums}
 #gps.bad{color:#FF9C8F;opacity:1}
@@ -40,6 +44,7 @@ nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);b
   padding-bottom:env(safe-area-inset-bottom,0px);z-index:1000}
 nav button{flex:1;border:0;background:none;padding:10px 0 12px;font-size:14px;font-weight:700;color:var(--sub)}
 nav button.on{color:var(--ink);box-shadow:inset 0 4px 0 var(--sign)}
+nav .badge{display:inline-block;min-width:18px;margin-left:4px;padding:0 5px;border-radius:9px;background:var(--stop);color:#fff;font-size:11px;line-height:18px}
 
 /* nearest */
 .near{background:var(--card);border-radius:14px;overflow:hidden;border:2px solid var(--ink)}
@@ -60,6 +65,7 @@ nav button.on{color:var(--ink);box-shadow:inset 0 4px 0 var(--sign)}
 .btn.ink{background:var(--ink);color:var(--card)}
 .btn.line{background:none;border:2px solid var(--line)}
 .btn.stop{background:none;border:2px solid var(--stop);color:var(--stop)}
+.btn.sm{padding:10px;font-size:15px}
 .btn:disabled{opacity:.45}
 
 h2{font-size:15px;color:var(--sub);margin:20px 2px 8px;font-weight:700}
@@ -73,12 +79,18 @@ h2{font-size:15px;color:var(--sub);margin:20px 2px 8px;font-weight:700}
 .empty{background:var(--card);border:2px dashed var(--line);border-radius:14px;padding:28px 18px;text-align:center;color:var(--sub)}
 
 /* register */
-.shots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.shot{aspect-ratio:3/4;border:2px dashed var(--line);border-radius:10px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;
-  text-align:center;font-weight:700;color:var(--sub);overflow:hidden;position:relative;padding:0}
+.import{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px}
+.prog{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-top:10px}
+.prog i{display:block;height:100%;width:0;background:var(--go);transition:width .2s}
+.draftbar{background:var(--sign);color:var(--signInk);border-radius:10px;padding:10px 12px;font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+.shots{display:grid;grid-template-columns:2fr 1fr;gap:8px;align-items:start}
+.shot{width:100%;aspect-ratio:3/4;border:2px dashed var(--line);border-radius:10px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;font-weight:700;color:var(--sub);overflow:hidden;position:relative;padding:0;font-size:14px}
 .shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#shotAddr img{object-fit:contain;background:#000}
 .shot.has{border-style:solid;border-color:var(--ink)}
-.shot .ic{font-size:30px}
+.shot .ic{font-size:28px}
+.chg{display:block;width:100%;margin-top:4px;border:0;background:none;color:var(--sub);font-size:13px;font-weight:700;text-decoration:underline;padding:4px}
 label.f{display:block;font-size:14px;font-weight:700;color:var(--sub);margin:14px 2px 6px}
 .in{display:flex;gap:6px}
 .pre{flex:none;align-self:center;font-size:14px;color:var(--sub);max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -91,8 +103,20 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 .gap{height:10px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
+/* pair check */
+.pc-row{display:grid;grid-template-columns:34px 1fr 1fr 44px;gap:6px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;margin-bottom:6px}
+.pc-row.warn{border-color:var(--stop)}
+.pc-no{font-weight:800;text-align:center;font-variant-numeric:tabular-nums}
+.pc-img{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--stop);font-weight:700;text-align:center}
+.pc-img img{width:100%;height:100%;object-fit:cover;display:block}
+.pc-img .tag{position:absolute;left:4px;top:4px;background:rgba(28,36,48,.8);color:#fff;font-size:11px;padding:1px 5px;border-radius:4px}
+.pc-img .tm{position:absolute;left:4px;bottom:4px;background:rgba(28,36,48,.8);color:#fff;font-size:11px;padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums}
+.pc-img .x{position:absolute;right:4px;top:4px;width:30px;height:30px;border-radius:15px;border:0;background:var(--stop);color:#fff;font-weight:800;font-size:16px;line-height:30px;padding:0}
+.pc-sw{height:44px;border:2px solid var(--line);border-radius:10px;background:none;font-size:18px;font-weight:800}
+.pc-actions{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom,0px));background:var(--bg);padding:10px 0 4px}
+
 /* overlays */
-#viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:2000;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#viewer{position:fixed;inset:0;background:rgba(0,0,0,.94);display:none;align-items:center;justify-content:center;z-index:2000;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
 #viewer.on{display:flex}
 #viewer img{max-width:100%;max-height:100%;object-fit:contain}
 #toast{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--card);border-radius:10px;padding:12px 14px;
@@ -107,7 +131,7 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 </head>
 <body>
 <header>
-  <h1>近い荷物</h1>
+  <h1>NearDrop</h1>
   <div id="gps">位置を取得中…</div>
 </header>
 
@@ -121,36 +145,74 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 
   <!-- 登録 -->
   <section id="tab-register">
-    <div class="shots">
-      <button class="shot" id="shotAddr" type="button"><span class="ic">📷</span>住所ラベル</button>
-      <button class="shot" id="shotPkg" type="button"><span class="ic">📦</span>荷物全体</button>
+    <div class="import" id="importBox">
+      <button class="btn ink" type="button" id="importBtn">ギャラリーから一括取り込み</button>
+      <p class="hint">住所→荷物の順で撮った写真をまとめて選んでください。撮影日時の順に2枚ずつペアにします。</p>
+      <input type="file" id="fileBulk" accept="image/*" multiple hidden>
+      <div id="importProg" hidden>
+        <div class="prog"><i id="progBar"></i></div>
+        <p class="hint" id="progText"></p>
+      </div>
     </div>
-    <input type="file" id="fileAddr" accept="image/*" capture="environment" hidden>
-    <input type="file" id="filePkg" accept="image/*" capture="environment" hidden>
 
-    <label class="f" for="addrIn">住所（丁目・番地まで）</label>
-    <div class="in">
-      <span class="pre" id="prefixShow"></span>
-      <input type="text" id="addrIn" placeholder="緑区橋本3-1-1" enterkeyhint="search" autocomplete="off">
-      <button type="button" id="searchBtn">探す</button>
+    <div id="pairCheck" hidden>
+      <div class="draftbar"><span id="pcTitle"></span></div>
+      <p class="hint">左が住所、右が荷物です。ずれていたら × で余分な写真を外すか、⇄ で左右を入れ替えてください。</p>
+      <div class="gap"></div>
+      <div id="pcList"></div>
+      <div class="pc-actions">
+        <button class="btn go" type="button" id="pcOk">この組み合わせで取り込む</button>
+        <div class="gap"></div>
+        <button class="btn line sm" type="button" id="pcCancel">取り込みをやめる</button>
+      </div>
     </div>
-    <div class="cands" id="cands"></div>
-    <div id="map"></div>
-    <p class="hint" id="posHint">地図をタップするか、ピンを動かして位置を合わせてください。</p>
-    <div class="gap"></div>
-    <button class="btn line" type="button" id="hereBtn">今いる場所を届け先にする</button>
 
-    <label class="f" for="memoIn">メモ（任意）</label>
-    <input type="text" id="memoIn" placeholder="置き配OK・午前指定など" autocomplete="off">
+    <div id="formBox">
+      <div class="draftbar" id="draftBar" hidden></div>
+      <div class="shots">
+        <div>
+          <button class="shot" id="shotAddr" type="button"></button>
+          <button class="chg" id="chgAddr" type="button" hidden>写真を変更</button>
+        </div>
+        <div>
+          <button class="shot" id="shotPkg" type="button"></button>
+          <button class="chg" id="chgPkg" type="button" hidden>写真を変更</button>
+        </div>
+      </div>
+      <p class="hint" id="shotHint" hidden>写真をタップすると拡大できます。</p>
+      <input type="file" id="fileAddr" accept="image/*" hidden>
+      <input type="file" id="filePkg" accept="image/*" hidden>
 
-    <div class="gap"></div><div class="gap"></div>
-    <button class="btn ink" type="button" id="saveBtn">保存する</button>
-    <div class="gap"></div>
-    <button class="btn line" type="button" id="cancelEditBtn" hidden>編集をやめる</button>
+      <label class="f" for="addrIn">住所（丁目・番地まで）</label>
+      <div class="in">
+        <span class="pre" id="prefixShow"></span>
+        <input type="text" id="addrIn" placeholder="緑区橋本3-1-1" enterkeyhint="search" autocomplete="off">
+        <button type="button" id="searchBtn">探す</button>
+      </div>
+      <div class="cands" id="cands"></div>
+      <div id="map"></div>
+      <p class="hint" id="posHint">地図をタップするか、ピンを動かして位置を合わせてください。</p>
+      <div class="gap"></div>
+      <button class="btn line sm" type="button" id="hereBtn">今いる場所を届け先にする</button>
+
+      <label class="f" for="memoIn">メモ（任意）</label>
+      <input type="text" id="memoIn" placeholder="置き配OK・午前指定など" autocomplete="off">
+
+      <div class="gap"></div><div class="gap"></div>
+      <button class="btn ink" type="button" id="saveBtn">保存する</button>
+      <div class="gap"></div>
+      <div class="two" id="draftBtns" hidden>
+        <button class="btn line sm" type="button" id="skipBtn">あとで入力</button>
+        <button class="btn stop sm" type="button" id="delDraftBtn">このペアを削除</button>
+      </div>
+      <button class="btn line sm" type="button" id="cancelEditBtn" hidden>編集をやめる</button>
+    </div>
   </section>
 
   <!-- 一覧 -->
   <section id="tab-list">
+    <h2 id="draftTitle">住所未入力</h2>
+    <div id="draftList"></div>
     <h2 id="pendTitle">未配達</h2>
     <div id="pendList"></div>
     <h2 id="doneTitle">配達済み</h2>
@@ -171,7 +233,7 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 
 <nav>
   <button type="button" data-tab="deliver" class="on">配達</button>
-  <button type="button" data-tab="register">登録</button>
+  <button type="button" data-tab="register">登録<span class="badge" id="draftBadge" hidden></span></button>
   <button type="button" data-tab="list">一覧</button>
 </nav>
 
@@ -214,6 +276,13 @@ function req(mode, fn){
 const dbAll = () => req('readonly', s => s.getAll());
 const dbPut = o => req('readwrite', s => s.put(o));
 const dbDel = id => req('readwrite', s => s.delete(id));
+function dbPutMany(list){
+  return new Promise((res, rej) => {
+    const t = db.transaction(ST, 'readwrite'), s = t.objectStore(ST);
+    list.forEach(o => s.put(o));
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+  });
+}
 
 /* ---------- 状態 ---------- */
 let parcels = [];
@@ -231,6 +300,7 @@ function dropUrls(id){
     if (urlCache.has(k)) { URL.revokeObjectURL(urlCache.get(k)); urlCache.delete(k); }
   }
 }
+const drafts = () => parcels.filter(p => p.draft).sort((a, b) => a.no - b.no);
 
 /* ---------- 便利関数 ---------- */
 const $ = id => document.getElementById(id);
@@ -250,6 +320,11 @@ function toHalf(s){
   return s.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
           .replace(/[－ー―‐−]/g, '-').replace(/　/g, ' ').trim();
 }
+function hms(t){
+  if (!t) return '';
+  const d = new Date(t), z = n => String(n).padStart(2, '0');
+  return `${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
+}
 function compress(file){
   return new Promise((res, rej) => {
     const u = URL.createObjectURL(file), img = new Image();
@@ -266,6 +341,54 @@ function compress(file){
   });
 }
 
+/* ---------- 撮影日時の取得 ---------- */
+// EXIF の撮影日時（ミリ秒付き）→ ファイル名の日時 → 更新日時 の順で使う
+async function exifTime(file){
+  try {
+    const buf = await file.slice(0, 196608).arrayBuffer();
+    const v = new DataView(buf);
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    let o = 2;
+    while (o + 4 < v.byteLength) {
+      const m = v.getUint16(o), len = v.getUint16(o + 2);
+      if ((m & 0xFF00) !== 0xFF00) break;
+      if (m === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) {
+        const t = o + 10, le = v.getUint16(t) === 0x4949;
+        const g16 = p => v.getUint16(p, le), g32 = p => v.getUint32(p, le);
+        const ifd = off => {
+          const n = g16(t + off), out = {};
+          for (let i = 0; i < n; i++) { const e = t + off + 2 + i * 12; out[g16(e)] = { count: g32(e + 4), off: e + 8 }; }
+          return out;
+        };
+        const str = ent => {
+          const p = ent.count > 4 ? t + g32(ent.off) : ent.off; let r = '';
+          for (let i = 0; i < ent.count; i++) { const c = v.getUint8(p + i); if (!c) break; r += String.fromCharCode(c); }
+          return r;
+        };
+        const i0 = ifd(g32(t + 4));
+        let s = null, sub = '';
+        if (i0[0x8769]) {
+          const ex = ifd(g32(i0[0x8769].off));
+          if (ex[0x9003]) s = str(ex[0x9003]);
+          if (ex[0x9291]) sub = str(ex[0x9291]).trim();
+        }
+        if (!s && i0[0x0132]) s = str(i0[0x0132]);
+        const mm = s && s.match(/(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+        if (!mm) return null;
+        const ms = /^\d+$/.test(sub) ? Math.round(parseFloat('0.' + sub) * 1000) : 0;
+        return new Date(+mm[1], mm[2] - 1, +mm[3], +mm[4], +mm[5], +mm[6], ms).getTime();
+      }
+      o += 2 + len;
+    }
+  } catch(e) {}
+  return null;
+}
+function nameTime(n){
+  const m = n.match(/(20\d{2})(\d{2})(\d{2})[_\-]?(\d{2})(\d{2})(\d{2})(\d{0,3})/);
+  if (!m) return null;
+  return new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6], m[7] ? +m[7].padEnd(3, '0') : 0).getTime();
+}
+
 /* ---------- トースト ---------- */
 let toastTimer, toastUndo = null;
 function toast(msg, undo){
@@ -274,7 +397,7 @@ function toast(msg, undo){
   $('toastBtn').hidden = !undo;
   $('toast').classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => $('toast').classList.remove('on'), undo ? 5000 : 2200);
+  toastTimer = setTimeout(() => $('toast').classList.remove('on'), undo ? 5000 : 2400);
 }
 $('toastBtn').onclick = async () => {
   $('toast').classList.remove('on');
@@ -293,14 +416,21 @@ function showTab(t){
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('main section').forEach(s => s.classList.toggle('on', s.id === 'tab-' + t));
   if (t === 'deliver') { lastOrderKey = ''; renderDeliver(); keepAwake(); }
-  if (t === 'register') { initMap(); setTimeout(() => map && map.invalidateSize(), 50); }
+  if (t === 'register') {
+    initMap(); setTimeout(() => map && map.invalidateSize(), 50);
+    if (!pairMode && !form.id && formIsEmpty()) { const d = drafts()[0]; if (d) loadDraft(d); }
+  }
   if (t === 'list') renderList();
   window.scrollTo(0, 0);
+}
+function updateBadge(){
+  const n = drafts().length;
+  $('draftBadge').hidden = !n; $('draftBadge').textContent = n;
 }
 
 /* ---------- 配達画面 ---------- */
 function sortedPending(){
-  const list = parcels.filter(p => !p.done).map(p => ({ p, d: pos ? distM(pos, p) : null }));
+  const list = parcels.filter(p => !p.done && !p.draft).map(p => ({ p, d: pos ? distM(pos, p) : null }));
   list.sort((a, b) => (a.d == null || b.d == null) ? a.p.no - b.p.no : a.d - b.d);
   return list;
 }
@@ -312,10 +442,12 @@ function renderDeliver(){
 
   const top = $('deliverTop'), rest = $('deliverList');
   if (!list.length) {
-    const any = parcels.length > 0;
-    top.innerHTML = `<div class="empty">${any
-      ? '<b>すべて配達しました。</b><br>明日の分は「一覧」で配達済みを削除してから登録してください。'
-      : '<b>荷物が登録されていません。</b><br>「登録」で住所ラベルと荷物の写真を撮って追加してください。'}</div>`;
+    const nd = drafts().length;
+    let msg;
+    if (nd) msg = `<b>住所が未入力の荷物が ${nd}件あります。</b><br>「登録」で住所を入力すると、ここに表示されます。`;
+    else if (parcels.length) msg = '<b>すべて配達しました。</b><br>明日の分は「一覧」で配達済みを削除してから取り込んでください。';
+    else msg = '<b>荷物が登録されていません。</b><br>「登録」でギャラリーから写真を取り込んでください。';
+    top.innerHTML = `<div class="empty">${msg}</div>`;
     rest.innerHTML = ''; $('nextTitle').hidden = true; lastTopId = null;
     return;
   }
@@ -329,8 +461,8 @@ function renderDeliver(){
         <div class="addr">${esc(p.addr)}</div>
         ${p.memo ? `<div class="memo">${esc(p.memo)}</div>` : ''}
         <div class="pics">
-          ${ua ? `<button class="pic" data-view="${ua}"><img src="${ua}" alt="住所ラベル"><span>住所ラベル</span></button>` : '<div class="pic none">住所写真なし</div>'}
-          ${up ? `<button class="pic" data-view="${up}"><img src="${up}" alt="荷物全体"><span>荷物全体</span></button>` : '<div class="pic none">荷物写真なし</div>'}
+          ${ua ? `<button class="pic" data-view="${ua}"><img src="${ua}" alt="住所の写真"><span>住所</span></button>` : '<div class="pic none">住所写真なし</div>'}
+          ${up ? `<button class="pic" data-view="${up}"><img src="${up}" alt="荷物の写真"><span>荷物</span></button>` : '<div class="pic none">荷物写真なし</div>'}
         </div>
         <button class="btn go" data-done="${p.id}">配達完了</button>
       </div>
@@ -401,9 +533,125 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && currentTab === 'deliver') keepAwake();
 });
 
-/* ---------- 登録画面 ---------- */
+/* ---------- 一括取り込み ---------- */
+let pairMode = false;
+let imports = []; // {blob, url, t}
+$('importBtn').onclick = () => {
+  if (pairMode) return;
+  $('fileBulk').click();
+};
+$('fileBulk').onchange = async e => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if (!files.length) return;
+  $('importBtn').disabled = true;
+  $('importProg').hidden = false;
+  const items = [];
+  let failed = 0;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    $('progText').textContent = `写真を読み込み中 ${i + 1} / ${files.length}`;
+    $('progBar').style.width = ((i + 1) / files.length * 100) + '%';
+    try {
+      const t = (await exifTime(f)) ?? nameTime(f.name) ?? f.lastModified;
+      const blob = await compress(f);
+      items.push({ blob, t, name: f.name });
+    } catch(err) { failed++; }
+  }
+  items.sort((a, b) => (a.t - b.t) || a.name.localeCompare(b.name, undefined, { numeric: true }));
+  items.forEach(it => it.url = URL.createObjectURL(it.blob));
+  imports = items;
+  $('importBtn').disabled = false;
+  $('importProg').hidden = true;
+  if (failed) toast(`${failed}枚の写真を読み込めませんでした`);
+  if (!imports.length) return;
+  openPairCheck();
+};
+function openPairCheck(){
+  pairMode = true;
+  $('importBox').hidden = true; $('formBox').hidden = true; $('pairCheck').hidden = false;
+  renderPairs();
+  window.scrollTo(0, 0);
+}
+function closePairCheck(){
+  imports.forEach(it => URL.revokeObjectURL(it.url));
+  imports = []; pairMode = false;
+  $('pairCheck').hidden = true; $('importBox').hidden = false; $('formBox').hidden = false;
+  setTimeout(() => map && map.invalidateSize(), 50);
+}
+function renderPairs(){
+  const nPairs = Math.ceil(imports.length / 2);
+  const odd = imports.length % 2 === 1;
+  $('pcTitle').textContent = `${imports.length}枚 → ${nPairs}件` + (odd ? '（最後の1件は荷物の写真なし）' : '');
+  let html = '';
+  for (let i = 0; i < imports.length; i += 2) {
+    const a = imports[i], b = imports[i + 1];
+    html += `<div class="pc-row${b ? '' : ' warn'}">
+      <div class="pc-no">${i / 2 + 1}</div>
+      <div class="pc-img"><img src="${a.url}" alt="" loading="lazy" data-view="${a.url}"><span class="tag">住所</span><span class="tm">${hms(a.t)}</span><button class="x" type="button" data-x="${i}" aria-label="この写真を外す">×</button></div>
+      ${b ? `<div class="pc-img"><img src="${b.url}" alt="" loading="lazy" data-view="${b.url}"><span class="tag">荷物</span><span class="tm">${hms(b.t)}</span><button class="x" type="button" data-x="${i + 1}" aria-label="この写真を外す">×</button></div>`
+          : '<div class="pc-img">荷物の写真がありません</div>'}
+      ${b ? `<button class="pc-sw" type="button" data-sw="${i}" aria-label="左右を入れ替え">⇄</button>` : '<span></span>'}
+    </div>`;
+  }
+  $('pcList').innerHTML = html;
+}
+$('pcList').addEventListener('click', e => {
+  const x = e.target.closest('[data-x]');
+  if (x) {
+    e.stopPropagation();
+    const i = +x.dataset.x;
+    URL.revokeObjectURL(imports[i].url);
+    imports.splice(i, 1);
+    if (!imports.length) { closePairCheck(); return; }
+    renderPairs(); return;
+  }
+  const s = e.target.closest('[data-sw]');
+  if (s) {
+    const i = +s.dataset.sw;
+    [imports[i], imports[i + 1]] = [imports[i + 1], imports[i]];
+    renderPairs();
+  }
+});
+$('pcCancel').onclick = () => {
+  if (!confirm('取り込みをやめますか？選んだ写真は登録されません。')) return;
+  closePairCheck();
+};
+$('pcOk').onclick = async () => {
+  const list = [];
+  const now = Date.now();
+  for (let i = 0; i < imports.length; i += 2) {
+    counter += 1;
+    list.push({
+      id: 'p' + now + '-' + i + Math.random().toString(36).slice(2, 5), no: counter,
+      addr: '', memo: '', lat: null, lng: null,
+      photoAddr: imports[i].blob, photoPkg: imports[i + 1] ? imports[i + 1].blob : null,
+      done: false, draft: true, createdAt: now
+    });
+  }
+  $('pcOk').disabled = true;
+  try {
+    await dbPutMany(list);
+    ls.set('counter', String(counter));
+    parcels.push(...list);
+  } catch(err) {
+    counter -= list.length;
+    toast('保存できませんでした。空き容量を確認してください');
+    $('pcOk').disabled = false;
+    return;
+  }
+  $('pcOk').disabled = false;
+  closePairCheck();
+  updateBadge();
+  toast(`${list.length}件を取り込みました。住所を入力してください`);
+  resetForm();
+  loadDraft(drafts()[0]);
+};
+
+/* ---------- 登録フォーム ---------- */
 let map = null, marker = null;
 const form = { id: null, photoAddr: null, photoPkg: null, lat: null, lng: null };
+const formUrls = { a: null, p: null };
 
 function initMap(){
   if (map || typeof L === 'undefined') return;
@@ -423,16 +671,31 @@ function setPin(lat, lng, keepZoom){
   map.setView([lat, lng], keepZoom ? map.getZoom() : 17);
   $('posHint').textContent = '位置をセットしました。ずれていればピンを動かしてください。';
 }
+function clearPin(){
+  form.lat = null; form.lng = null;
+  if (marker) { marker.remove(); marker = null; }
+  if (map) map.setView(pos ? [pos.lat, pos.lng] : DEFAULT_CENTER, 15);
+  $('posHint').textContent = '地図をタップするか、ピンを動かして位置を合わせてください。';
+}
 
 function showShot(which, blob){
   const btn = which === 'a' ? $('shotAddr') : $('shotPkg');
-  const label = which === 'a' ? '<span class="ic">📷</span>住所ラベル' : '<span class="ic">📦</span>荷物全体';
-  btn.querySelector('img') && URL.revokeObjectURL(btn.querySelector('img').src);
-  if (blob) { btn.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="">`; btn.classList.add('has'); }
-  else { btn.innerHTML = label; btn.classList.remove('has'); }
+  const chg = which === 'a' ? $('chgAddr') : $('chgPkg');
+  if (formUrls[which]) { URL.revokeObjectURL(formUrls[which]); formUrls[which] = null; }
+  if (blob) {
+    formUrls[which] = URL.createObjectURL(blob);
+    btn.innerHTML = `<img src="${formUrls[which]}" alt="">`;
+    btn.classList.add('has'); chg.hidden = false;
+  } else {
+    btn.innerHTML = which === 'a' ? '<span class="ic">🏠</span>住所の写真' : '<span class="ic">📦</span>荷物の写真';
+    btn.classList.remove('has'); chg.hidden = true;
+  }
+  $('shotHint').hidden = !(form.photoAddr || form.photoPkg);
 }
-$('shotAddr').onclick = () => $('fileAddr').click();
-$('shotPkg').onclick = () => $('filePkg').click();
+$('shotAddr').onclick = () => formUrls.a ? openViewer(formUrls.a) : $('fileAddr').click();
+$('shotPkg').onclick = () => formUrls.p ? openViewer(formUrls.p) : $('filePkg').click();
+$('chgAddr').onclick = () => $('fileAddr').click();
+$('chgPkg').onclick = () => $('filePkg').click();
 async function onFile(input, which){
   const f = input.files && input.files[0];
   input.value = '';
@@ -461,8 +724,8 @@ async function search(){
     if (c.length > 1) {
       $('cands').innerHTML = c.map((x, i) => `<button type="button" data-i="${i}">${i === 0 ? '✓ ' : ''}${esc(x.title)}</button>`).join('');
       $('cands').querySelectorAll('button').forEach(b => b.onclick = () => {
-        const x = c[+b.dataset.i]; setPin(x.lat, x.lng);
-        $('cands').querySelectorAll('button').forEach((bb, i) => bb.textContent = (i === +b.dataset.i ? '✓ ' : '') + c[i].title);
+        const k = +b.dataset.i; setPin(c[k].lat, c[k].lng);
+        $('cands').querySelectorAll('button').forEach((bb, i) => bb.textContent = (i === k ? '✓ ' : '') + c[i].title);
       });
     }
   } catch(e) {
@@ -476,65 +739,119 @@ $('hereBtn').onclick = () => {
   initMap(); setPin(pos.lat, pos.lng);
 };
 
+function formIsEmpty(){
+  return !form.photoAddr && !form.photoPkg && form.lat == null && !$('addrIn').value.trim() && !$('memoIn').value.trim();
+}
 function resetForm(){
-  form.id = null; form.photoAddr = null; form.photoPkg = null; form.lat = null; form.lng = null;
+  form.id = null; form.photoAddr = null; form.photoPkg = null;
   showShot('a', null); showShot('p', null);
   $('addrIn').value = ''; $('memoIn').value = ''; $('cands').innerHTML = '';
-  if (marker) { marker.remove(); marker = null; }
-  $('posHint').textContent = '地図をタップするか、ピンを動かして位置を合わせてください。';
-  $('saveBtn').textContent = '保存する'; $('cancelEditBtn').hidden = true;
+  clearPin();
+  $('saveBtn').textContent = '保存する';
+  $('cancelEditBtn').hidden = true; $('draftBtns').hidden = true; $('draftBar').hidden = true;
+}
+function fillForm(p){
+  resetForm();
+  form.id = p.id; form.photoAddr = p.photoAddr; form.photoPkg = p.photoPkg;
+  showShot('a', p.photoAddr); showShot('p', p.photoPkg);
+  $('addrIn').value = p.addr || ''; $('memoIn').value = p.memo || '';
+  initMap();
+  setTimeout(() => {
+    if (map) map.invalidateSize();
+    if (p.lat != null) setPin(p.lat, p.lng);
+  }, 60);
+}
+function loadDraft(p){
+  if (!p) return;
+  fillForm(p);
+  const rest = drafts().length;
+  $('draftBar').hidden = false;
+  $('draftBar').innerHTML = `<span>No.${p.no} の住所を入力</span><span>残り ${rest}件</span>`;
+  $('saveBtn').textContent = '保存して次へ';
+  $('draftBtns').hidden = false;
+}
+function editParcel(id){
+  const p = parcels.find(x => x.id === id); if (!p) return;
+  showTab('register');
+  if (p.draft) { loadDraft(p); return; }
+  fillForm(p);
+  $('saveBtn').textContent = `No.${p.no} を更新する`; $('cancelEditBtn').hidden = false;
+}
+function nextDraftAfter(no){
+  const d = drafts();
+  return d.find(x => x.no > no) || d[0] || null;
+}
+function afterDraftDone(prevNo){
+  const n = nextDraftAfter(prevNo);
+  if (n) loadDraft(n);
+  else { resetForm(); toast('すべての住所を入力しました'); }
+  updateBadge(); lastOrderKey = '';
+  window.scrollTo(0, 0);
 }
 $('cancelEditBtn').onclick = () => { resetForm(); showTab('list'); };
+$('skipBtn').onclick = () => {
+  const cur = parcels.find(x => x.id === form.id); if (!cur) return;
+  const others = drafts().filter(x => x.id !== cur.id);
+  if (!others.length) { toast('ほかに未入力の荷物はありません'); return; }
+  loadDraft(others.find(x => x.no > cur.no) || others[0]);
+  window.scrollTo(0, 0);
+};
+$('delDraftBtn').onclick = async () => {
+  const cur = parcels.find(x => x.id === form.id); if (!cur) return;
+  if (!confirm(`No.${cur.no} のペアを削除しますか？`)) return;
+  await dbDel(cur.id); dropUrls(cur.id);
+  parcels = parcels.filter(x => x.id !== cur.id);
+  afterDraftDone(cur.no);
+};
 
 $('saveBtn').onclick = async () => {
   if (form.lat == null) { toast('届け先の位置を決めてください（探す・地図タップ・今いる場所）'); return; }
   const addrTxt = toHalf($('addrIn').value);
   const addr = addrTxt ? (addrTxt.startsWith(prefix) ? addrTxt.slice(prefix.length) : addrTxt) : '住所未入力';
+  const memo = $('memoIn').value.trim();
   if (form.id) {
     const p = parcels.find(x => x.id === form.id);
-    Object.assign(p, { addr, memo: $('memoIn').value.trim(), lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg });
+    const wasDraft = !!p.draft;
+    Object.assign(p, { addr, memo, lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg, draft: false });
     dropUrls(p.id); await dbPut(p);
+    if (wasDraft) { toast(`No.${p.no} を保存しました`); afterDraftDone(p.no); return; }
     toast(`No.${p.no} を更新しました`);
     resetForm(); lastOrderKey = ''; showTab('list');
     return;
   }
   counter += 1; ls.set('counter', String(counter));
-  const p = { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), no: counter, addr,
-    memo: $('memoIn').value.trim(), lat: form.lat, lng: form.lng,
-    photoAddr: form.photoAddr, photoPkg: form.photoPkg, done: false, createdAt: Date.now() };
+  const p = { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), no: counter, addr, memo,
+    lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg,
+    done: false, draft: false, createdAt: Date.now() };
   await dbPut(p); parcels.push(p);
   lastOrderKey = '';
-  toast(`No.${p.no} を保存しました（未配達 ${parcels.filter(x => !x.done).length}件）`);
+  toast(`No.${p.no} を保存しました`);
   resetForm(); window.scrollTo(0, 0);
 };
 
-function editParcel(id){
-  const p = parcels.find(x => x.id === id); if (!p) return;
-  showTab('register'); resetForm();
-  form.id = p.id; form.photoAddr = p.photoAddr; form.photoPkg = p.photoPkg;
-  showShot('a', p.photoAddr); showShot('p', p.photoPkg);
-  $('addrIn').value = p.addr === '住所未入力' ? '' : p.addr; $('memoIn').value = p.memo || '';
-  setTimeout(() => { map && map.invalidateSize(); setPin(p.lat, p.lng); }, 60);
-  $('saveBtn').textContent = `No.${p.no} を更新する`; $('cancelEditBtn').hidden = false;
-}
-
 /* ---------- 一覧・設定 ---------- */
 function renderList(){
-  const pend = parcels.filter(p => !p.done).sort((a, b) => a.no - b.no);
+  const dr = drafts();
+  const pend = parcels.filter(p => !p.done && !p.draft).sort((a, b) => a.no - b.no);
   const done = parcels.filter(p => p.done).sort((a, b) => b.doneAt - a.doneAt);
+  $('draftTitle').hidden = !dr.length; $('draftList').hidden = !dr.length;
+  $('draftTitle').textContent = `住所未入力 ${dr.length}件`;
   $('pendTitle').textContent = `未配達 ${pend.length}件`;
   $('doneTitle').textContent = `配達済み ${done.length}件`;
-  const row = (p, isDone) => {
-    const u = blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr);
+  const row = (p, kind) => {
+    const u = kind === 'draft' ? blobUrl(p.id + ':a', p.photoAddr) : (blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr));
+    const btns = kind === 'done' ? `<button class="mini" data-undo="${p.id}">戻す</button>`
+      : kind === 'draft' ? `<button class="mini" data-edit="${p.id}">入力</button>`
+      : `<button class="mini" data-edit="${p.id}">編集</button><button class="mini" data-del="${p.id}">削除</button>`;
     return `<div class="row">
       ${u ? `<img src="${u}" alt="" data-view="${u}">` : '<div class="ph"></div>'}
-      <div class="t"><div class="a">${esc(p.addr)}</div><div class="s">No.${p.no}${p.memo ? ' / ' + esc(p.memo) : ''}</div></div>
-      ${isDone ? `<button class="mini" data-undo="${p.id}">戻す</button>`
-               : `<button class="mini" data-edit="${p.id}">編集</button><button class="mini" data-del="${p.id}">削除</button>`}
+      <div class="t"><div class="a">${kind === 'draft' ? '住所未入力' : esc(p.addr)}</div><div class="s">No.${p.no}${p.memo ? ' / ' + esc(p.memo) : ''}</div></div>
+      ${btns}
     </div>`;
   };
-  $('pendList').innerHTML = pend.length ? pend.map(p => row(p, false)).join('') : '<p class="hint">未配達の荷物はありません。</p>';
-  $('doneList').innerHTML = done.length ? done.map(p => row(p, true)).join('') : '<p class="hint">まだありません。</p>';
+  $('draftList').innerHTML = dr.map(p => row(p, 'draft')).join('');
+  $('pendList').innerHTML = pend.length ? pend.map(p => row(p, 'pend')).join('') : '<p class="hint">未配達の荷物はありません。</p>';
+  $('doneList').innerHTML = done.length ? done.map(p => row(p, 'done')).join('') : '<p class="hint">まだありません。</p>';
   storageInfo();
 }
 $('tab-list').addEventListener('click', async e => {
@@ -559,9 +876,10 @@ $('clearDoneBtn').onclick = async () => {
 };
 $('clearAllBtn').onclick = async () => {
   if (!parcels.length) { toast('登録された荷物はありません'); return; }
-  if (!confirm(`未配達を含む ${parcels.length}件をすべて削除します。よろしいですか？`)) return;
+  if (!confirm(`未配達・住所未入力を含む ${parcels.length}件をすべて削除します。よろしいですか？`)) return;
   for (const p of parcels) { await dbDel(p.id); dropUrls(p.id); }
   parcels = []; counter = 0; ls.set('counter', '0');
+  resetForm(); updateBadge();
   lastOrderKey = ''; renderList(); toast('すべて削除しました');
 };
 $('prefixIn').value = prefix;
@@ -581,14 +899,16 @@ async function storageInfo(){
 /* ---------- 起動 ---------- */
 (async () => {
   $('prefixShow').textContent = prefix;
+  showShot('a', null); showShot('p', null);
   try {
     db = await openDB();
     parcels = await dbAll();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   } catch(e) {
-    $('deliverTop').innerHTML = '<div class="empty"><b>保存領域を開けません。</b><br>プライベートブラウズを解除して開き直してください。</div>';
+    $('deliverTop').innerHTML = '<div class="empty"><b>保存領域を開けません。</b><br>シークレットモードを解除して開き直してください。</div>';
     return;
   }
+  updateBadge();
   renderDeliver();
   startGPS();
   keepAwake();
