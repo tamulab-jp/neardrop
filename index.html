@@ -113,6 +113,22 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 .pc-img .tm{position:absolute;left:4px;bottom:4px;background:rgba(28,36,48,.8);color:#fff;font-size:11px;padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums}
 .pc-img .x{position:absolute;right:4px;top:4px;width:30px;height:30px;border-radius:15px;border:0;background:var(--stop);color:#fff;font-weight:800;font-size:16px;line-height:30px;padding:0}
 .pc-sw{height:44px;border:2px solid var(--line);border-radius:10px;background:none;font-size:18px;font-weight:800}
+.near .cnt{font-size:22px;font-weight:800;text-align:right;line-height:1.1}
+.near .cnt small{display:block;font-size:12px;font-weight:700}
+.rooms{font-size:14px;font-weight:700;color:var(--sub);margin-top:2px}
+.slides{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin:12px -14px 6px;padding:0 14px;scrollbar-width:none}
+.slides::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:center;min-width:0}
+.slides.multi .slide{flex-basis:88%}
+.spics{display:grid;grid-template-columns:2fr 1fr;gap:8px;align-items:start}
+.spics .pic.big{aspect-ratio:3/4}
+.spics .pic.small{aspect-ratio:3/4}
+.who{margin-top:8px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.who .rm{font-weight:800;background:var(--ink);color:var(--card);border-radius:6px;padding:1px 7px;font-size:14px}
+.who .nm{font-size:18px;font-weight:800}
+.who a.tel{font-weight:800;color:var(--go);text-decoration:none;border:1.5px solid var(--go);border-radius:8px;padding:2px 9px;font-size:15px;font-variant-numeric:tabular-nums}
+.slide .one{margin-top:8px;border:2px solid var(--line);background:none;border-radius:8px;padding:8px;width:100%;font-weight:700;font-size:15px}
+.pager{text-align:center;font-size:13px;color:var(--sub);font-weight:700;margin-bottom:10px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 .chip{font-size:13px;font-weight:700;padding:3px 9px;border-radius:12px;border:1.5px solid var(--line);background:var(--card)}
 .chip.ok{border-color:var(--go);color:var(--go)}
@@ -206,8 +222,18 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
         <input type="text" id="addrIn" placeholder="緑区橋本3-1-1" enterkeyhint="search" autocomplete="off">
         <button type="button" id="searchBtn">探す</button>
       </div>
-      <label class="f" for="bldIn">建物名・部屋番号（任意）</label>
-      <input type="text" id="bldIn" placeholder="〇〇マンション 201号" autocomplete="off">
+      <div class="two" style="margin-top:0">
+        <div><label class="f" for="bldIn">建物名（任意）</label>
+        <input type="text" id="bldIn" placeholder="メゾンさくら" autocomplete="off"></div>
+        <div><label class="f" for="roomIn">部屋番号（任意）</label>
+        <input type="text" id="roomIn" placeholder="201号室" autocomplete="off"></div>
+      </div>
+      <div class="two">
+        <div><label class="f" for="nameIn">お名前</label>
+        <input type="text" id="nameIn" placeholder="山田太郎" autocomplete="off"></div>
+        <div><label class="f" for="telIn">電話番号</label>
+        <input type="text" id="telIn" placeholder="090-1234-5678" inputmode="tel" autocomplete="off"></div>
+      </div>
       <div class="cands" id="cands"></div>
       <div id="map"></div>
       <p class="hint" id="posHint">地図をタップするか、ピンを動かして位置を合わせてください。</p>
@@ -323,6 +349,12 @@ function dropUrls(id){
     if (urlCache.has(k)) { URL.revokeObjectURL(urlCache.get(k)); urlCache.delete(k); }
   }
 }
+function normKey(s){ return toHalf(s || '').replace(/\s+/g, '').replace(/[ヶケ]/g, 'ケ').toLowerCase(); }
+function bldLine(p){ return [p.bld, p.room].filter(Boolean).join(' '); }
+function fullAddr(p){ return [p.addr, p.bld, p.room].filter(Boolean).join(' '); }
+// 建物単位でまとめる：番地＋建物名が同じものは1グループ
+function groupKey(p){ return normKey(p.addr) + '|' + normKey(p.bld); }
+function telHref(t){ return 'tel:' + String(t || '').replace(/[^0-9+]/g, ''); }
 const drafts = () => parcels.filter(p => p.draft).sort((a, b) => a.no - b.no);
 
 /* ---------- 便利関数 ---------- */
@@ -453,19 +485,39 @@ function updateBadge(){
 }
 
 /* ---------- 配達画面 ---------- */
-function sortedPending(){
-  const list = parcels.filter(p => !p.done && !p.draft).map(p => ({ p, d: pos ? distM(pos, p) : null }));
-  list.sort((a, b) => (a.d == null || b.d == null) ? a.p.no - b.p.no : a.d - b.d);
-  return list;
+function roomSort(a, b){
+  return String(a.room || '').localeCompare(String(b.room || ''), 'ja', { numeric: true }) || a.no - b.no;
+}
+function groupedPending(){
+  const map = new Map();
+  for (const p of parcels) {
+    if (p.done || p.draft) continue;
+    const k = groupKey(p);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(p);
+  }
+  const groups = [...map.values()].map(items => {
+    items.sort(roomSort);
+    const d = pos ? Math.min(...items.map(p => distM(pos, p))) : null;
+    return { id: items[0].id, items, d, minNo: Math.min(...items.map(p => p.no)) };
+  });
+  groups.sort((x, y) => (x.d == null || y.d == null) ? x.minNo - y.minNo : x.d - y.d);
+  return groups;
+}
+function roomSummary(items){
+  const m = new Map();
+  for (const p of items) { const r = p.room || ''; m.set(r, (m.get(r) || 0) + 1); }
+  if (m.size <= 1 && !items[0].room) return '';
+  return [...m.entries()].map(([r, n]) => `${esc(r || '部屋番号なし')} ${n}個`).join(' ／ ');
 }
 function renderDeliver(){
-  const list = sortedPending();
-  const key = list.map(x => x.p.id).join(',');
-  if (key === lastOrderKey && key) { updateDistances(list); return; }
+  const groups = groupedPending();
+  const key = groups.map(g => g.items.map(p => p.id).join('+')).join(',');
+  if (key === lastOrderKey && key) { updateDistances(groups); return; }
   lastOrderKey = key;
 
   const top = $('deliverTop'), rest = $('deliverList');
-  if (!list.length) {
+  if (!groups.length) {
     const nd = drafts().length;
     let msg;
     if (nd) msg = `<b>住所の確認待ちが ${nd}件あります。</b><br>「登録」で確定すると、ここに表示されます。`;
@@ -475,44 +527,73 @@ function renderDeliver(){
     rest.innerHTML = ''; $('nextTitle').hidden = true; lastTopId = null;
     return;
   }
-  const { p, d } = list[0];
-  const [n, u] = fmt(d);
-  const ua = blobUrl(p.id + ':a', p.photoAddr), up = blobUrl(p.id + ':p', p.photoPkg);
+  const g = groups[0], n = g.items.length;
+  const [dv, du] = fmt(g.d);
+  const first = g.items[0];
+  const slides = g.items.map((p, i) => {
+    const up = blobUrl(p.id + ':p', p.photoPkg), ua = blobUrl(p.id + ':a', p.photoAddr);
+    return `<div class="slide">
+      <div class="spics">
+        ${up ? `<button class="pic big" data-view="${up}"><img src="${up}" alt="荷物の写真"><span>荷物${n > 1 ? ' ' + (i + 1) : ''}</span></button>` : '<div class="pic big none">荷物写真なし</div>'}
+        ${ua ? `<button class="pic small" data-view="${ua}"><img src="${ua}" alt="住所の写真"><span>住所</span></button>` : '<div class="pic small none">住所写真なし</div>'}
+      </div>
+      <div class="who">
+        ${p.room ? `<span class="rm">${esc(p.room)}</span>` : ''}
+        <span class="nm">${p.name ? esc(p.name) + ' 様' : '<span style="color:var(--sub);font-size:15px">名前なし</span>'}</span>
+        ${p.tel ? `<a class="tel" href="${telHref(p.tel)}">📞 ${esc(p.tel)}</a>` : ''}
+      </div>
+      ${p.memo ? `<div class="memo">${esc(p.memo)}</div>` : ''}
+      <div class="s" style="font-size:12px;color:var(--sub);margin-top:2px">No.${p.no}</div>
+      ${n > 1 ? `<button class="one" data-done="${p.id}">この1個だけ配達完了</button>` : ''}
+    </div>`;
+  }).join('');
   top.innerHTML = `
     <div class="near">
-      <div class="band"><div class="dist" data-dist="${p.id}">${n}<small>${u}</small></div><div class="no">No.${p.no}</div></div>
+      <div class="band">
+        <div class="dist" data-dist="${g.id}">${dv}<small>${du}</small></div>
+        <div class="cnt">${n}個<small>${n > 1 ? '同じ建物' : 'No.' + first.no}</small></div>
+      </div>
       <div class="body">
-        <div class="addr">${esc(p.addr)}</div>
-        ${p.memo ? `<div class="memo">${esc(p.memo)}</div>` : ''}
-        <div class="pics">
-          ${ua ? `<button class="pic" data-view="${ua}"><img src="${ua}" alt="住所の写真"><span>住所</span></button>` : '<div class="pic none">住所写真なし</div>'}
-          ${up ? `<button class="pic" data-view="${up}"><img src="${up}" alt="荷物の写真"><span>荷物</span></button>` : '<div class="pic none">荷物写真なし</div>'}
-        </div>
-        <button class="btn go" data-done="${p.id}">配達完了</button>
+        <div class="addr">${esc(first.addr)}${first.bld ? ' ' + esc(first.bld) : ''}</div>
+        ${n > 1 && roomSummary(g.items) ? `<div class="rooms">${roomSummary(g.items)}</div>` : ''}
+        <div class="slides${n > 1 ? ' multi' : ''}" id="slides">${slides}</div>
+        ${n > 1 ? `<div class="pager" id="pager">1 / ${n}　← スワイプで他の荷物 →</div>` : ''}
+        <button class="btn go" data-done="${g.items.map(p => p.id).join(',')}">${n > 1 ? n + '個まとめて配達完了' : '配達完了'}</button>
       </div>
     </div>`;
+  if (n > 1) {
+    const sl = $('slides');
+    sl.addEventListener('scroll', () => {
+      const w = sl.firstElementChild.getBoundingClientRect().width + 10;
+      const i = Math.min(n - 1, Math.max(0, Math.round(sl.scrollLeft / w)));
+      $('pager').textContent = `${i + 1} / ${n}　← スワイプで他の荷物 →`;
+    }, { passive: true });
+  }
 
-  $('nextTitle').hidden = list.length < 2;
-  rest.innerHTML = list.slice(1).map(({ p, d }) => {
-    const [n, u] = fmt(d);
+  $('nextTitle').hidden = groups.length < 2;
+  rest.innerHTML = groups.slice(1).map(g => {
+    const [dv, du] = fmt(g.d);
+    const p = g.items[0];
     const ua = blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr);
+    const names = g.items.map(x => x.name).filter(Boolean);
+    const sub = (g.items.length > 1 ? `<b>${g.items.length}個</b> ` : '') + esc(names.slice(0, 3).join('・') + (names.length > 3 ? '…' : ''));
     return `<div class="row">
       ${ua ? `<img src="${ua}" alt="" data-view="${ua}">` : '<div class="ph"></div>'}
-      <div class="t"><div class="a">${esc(p.addr)}</div><div class="s">No.${p.no}${p.memo ? ' / ' + esc(p.memo) : ''}</div></div>
-      <div class="d" data-dist="${p.id}">${n}${u}</div>
+      <div class="t"><div class="a">${esc(p.addr)}${p.bld ? ' ' + esc(p.bld) : ''}</div><div class="s">${sub || 'No.' + p.no}</div></div>
+      <div class="d" data-dist="${g.id}">${dv}${du}</div>
     </div>`;
   }).join('');
 
-  if (p.id !== lastTopId) {
-    if (lastTopId !== null && d != null && d < NEAR_VIBRATE_M && navigator.vibrate) navigator.vibrate(200);
-    lastTopId = p.id;
+  if (g.id !== lastTopId) {
+    if (lastTopId !== null && g.d != null && g.d < NEAR_VIBRATE_M && navigator.vibrate) navigator.vibrate(200);
+    lastTopId = g.id;
   }
 }
-function updateDistances(list){
-  for (const { p, d } of list) {
-    const el = document.querySelector(`[data-dist="${p.id}"]`);
+function updateDistances(groups){
+  for (const g of groups) {
+    const el = document.querySelector(`[data-dist="${g.id}"]`);
     if (!el) continue;
-    const [n, u] = fmt(d);
+    const [n, u] = fmt(g.d);
     el.innerHTML = el.classList.contains('dist') ? `${n}<small>${u}</small>` : `${n}${u}`;
   }
 }
@@ -520,16 +601,19 @@ document.addEventListener('click', async e => {
   const v = e.target.closest('[data-view]');
   if (v) { openViewer(v.dataset.view); return; }
   const dn = e.target.closest('[data-done]');
-  if (dn) await markDone(dn.dataset.done, true);
+  if (dn) await markDone(dn.dataset.done.split(','), true);
 });
-async function markDone(id, done){
-  const p = parcels.find(x => x.id === id);
-  if (!p) return;
-  p.done = done; p.doneAt = done ? Date.now() : null;
-  await dbPut(p);
+async function markDone(ids, done){
+  if (!Array.isArray(ids)) ids = [ids];
+  const list = ids.map(id => parcels.find(x => x.id === id)).filter(Boolean);
+  if (!list.length) return;
+  for (const p of list) { p.done = done; p.doneAt = done ? Date.now() : null; await dbPut(p); }
   lastOrderKey = '';
   renderDeliver(); if (currentTab === 'list') renderList();
-  if (done) toast(`No.${p.no} を配達済みにしました`, () => markDone(id, false));
+  if (done) {
+    const msg = list.length > 1 ? `${list.length}個を配達済みにしました` : `No.${list[0].no} を配達済みにしました`;
+    toast(msg, () => markDone(ids, false));
+  }
 }
 
 /* ---------- GPS ---------- */
@@ -688,8 +772,8 @@ async function ocrOne(p){
     const r = await fetch(OCR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, type: 'image/jpeg' }) });
     const j = await r.json().catch(() => ({ ok: false, error: 'サーバーの応答が不正です' }));
     if (!j.ok) { p.ocr = { status: 'fail', error: j.error || ('HTTP ' + r.status) }; return j.error || ''; }
-    p.ocr = { status: 'done', postal: j.postal, address: j.address, building: j.building,
-              confidence: j.confidence, postalMatch: j.postal_match, note: j.note };
+    p.ocr = { status: 'done', postal: j.postal, address: j.address, building: j.building, room: j.room || '',
+              name: j.name || '', tel: j.tel || '', confidence: j.confidence, postalMatch: j.postal_match, note: j.note };
     if (j.address) {
       try {
         const c = await gsiSearch(buildQuery(j.address));
@@ -763,8 +847,9 @@ $('bulkOkBtn').onclick = async () => {
   if (!sure.length) return;
   if (!confirm(`自信度が高く、郵便番号と住所が一致し、番地まで位置が特定できた ${sure.length}件を確認なしで確定します。よろしいですか？`)) return;
   for (const p of sure) {
-    p.addr = stripPrefix(p.ocr.address) + (p.ocr.building ? ' ' + p.ocr.building : '');
-    p.bld = p.ocr.building || '';
+    p.addr = stripPrefix(p.ocr.address);
+    p.bld = p.ocr.building || ''; p.room = p.ocr.room || '';
+    p.name = p.ocr.name || ''; p.tel = p.ocr.tel || '';
     p.draft = false;
     await dbPut(p); dropUrls(p.id);
   }
@@ -886,7 +971,7 @@ function formIsEmpty(){
 function resetForm(){
   form.id = null; form.photoAddr = null; form.photoPkg = null;
   showShot('a', null); showShot('p', null);
-  $('addrIn').value = ''; $('bldIn').value = ''; $('memoIn').value = ''; $('cands').innerHTML = '';
+  $('addrIn').value = ''; $('bldIn').value = ''; $('roomIn').value = ''; $('nameIn').value = ''; $('telIn').value = ''; $('memoIn').value = ''; $('cands').innerHTML = '';
   $('ocrChips').hidden = true; $('reOcrBtn').hidden = true;
   clearPin();
   $('saveBtn').textContent = '保存する';
@@ -896,8 +981,9 @@ function fillForm(p){
   resetForm();
   form.id = p.id; form.photoAddr = p.photoAddr; form.photoPkg = p.photoPkg;
   showShot('a', p.photoAddr); showShot('p', p.photoPkg);
-  $('addrIn').value = (p.bld && (p.addr || '').endsWith(' ' + p.bld)) ? p.addr.slice(0, -(p.bld.length + 1)) : (p.addr || '');
-  $('bldIn').value = p.bld || ''; $('memoIn').value = p.memo || '';
+  $('addrIn').value = p.addr || '';
+  $('bldIn').value = p.bld || ''; $('roomIn').value = p.room || '';
+  $('nameIn').value = p.name || ''; $('telIn').value = p.tel || ''; $('memoIn').value = p.memo || '';
   initMap();
   setTimeout(() => {
     if (map) map.invalidateSize();
@@ -909,7 +995,8 @@ function loadDraft(p){
   fillForm(p);
   if (p.ocr && p.ocr.status === 'done') {
     $('addrIn').value = stripPrefix(p.ocr.address);
-    $('bldIn').value = p.ocr.building || '';
+    $('bldIn').value = p.ocr.building || ''; $('roomIn').value = p.ocr.room || '';
+    $('nameIn').value = p.ocr.name || ''; $('telIn').value = p.ocr.tel || '';
   }
   renderChips(p);
   $('reOcrBtn').hidden = !p.photoAddr || ocrRunning;
@@ -987,11 +1074,12 @@ $('saveBtn').onclick = async () => {
   const addrTxt = toHalf($('addrIn').value);
   const addr = addrTxt ? (addrTxt.startsWith(prefix) ? addrTxt.slice(prefix.length) : addrTxt) : '住所未入力';
   const memo = $('memoIn').value.trim();
-  const bld = toHalf($('bldIn').value);
+  const bld = toHalf($('bldIn').value), room = toHalf($('roomIn').value);
+  const name = $('nameIn').value.trim(), tel = toHalf($('telIn').value);
   if (form.id) {
     const p = parcels.find(x => x.id === form.id);
     const wasDraft = !!p.draft;
-    Object.assign(p, { addr: addr + (bld ? ' ' + bld : ''), bld, memo, lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg, draft: false });
+    Object.assign(p, { addr, bld, room, name, tel, memo, lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg, draft: false });
     dropUrls(p.id); await dbPut(p);
     if (wasDraft) { toast(`No.${p.no} を保存しました`); afterDraftDone(p.no); return; }
     toast(`No.${p.no} を更新しました`);
@@ -999,7 +1087,7 @@ $('saveBtn').onclick = async () => {
     return;
   }
   counter += 1; ls.set('counter', String(counter));
-  const p = { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), no: counter, addr: addr + (bld ? ' ' + bld : ''), bld, memo,
+  const p = { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), no: counter, addr, bld, room, name, tel, memo,
     lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg,
     done: false, draft: false, createdAt: Date.now() };
   await dbPut(p); parcels.push(p);
@@ -1024,7 +1112,7 @@ function renderList(){
       : `<button class="mini" data-edit="${p.id}">編集</button><button class="mini" data-del="${p.id}">削除</button>`;
     return `<div class="row">
       ${u ? `<img src="${u}" alt="" data-view="${u}">` : '<div class="ph"></div>'}
-      <div class="t"><div class="a">${kind === 'draft' ? esc(p.ocr && p.ocr.address ? stripPrefix(p.ocr.address) : '住所未入力') : esc(p.addr)}</div><div class="s">No.${p.no}${kind === 'draft' ? ` <span class="st ${ocrState(p)[1]}">${ocrState(p)[0]}</span>` : (p.memo ? ' / ' + esc(p.memo) : '')}</div></div>
+      <div class="t"><div class="a">${kind === 'draft' ? esc(p.ocr && p.ocr.address ? stripPrefix(p.ocr.address) + (p.ocr.building ? ' ' + p.ocr.building : '') + (p.ocr.room ? ' ' + p.ocr.room : '') : '住所未入力') : esc(fullAddr(p))}</div><div class="s">No.${p.no}${kind === 'draft' ? ` <span class="st ${ocrState(p)[1]}">${ocrState(p)[0]}</span>${p.ocr && p.ocr.name ? ' ' + esc(p.ocr.name) : ''}` : (p.name ? ' ' + esc(p.name) : '') + (p.memo ? ' / ' + esc(p.memo) : '')}</div></div>
       ${btns}
     </div>`;
   };
@@ -1039,7 +1127,7 @@ $('tab-list').addEventListener('click', async e => {
   if (b.dataset.undo) await markDone(b.dataset.undo, false);
   if (b.dataset.del) {
     const p = parcels.find(x => x.id === b.dataset.del);
-    if (!confirm(`No.${p.no}「${p.addr}」を削除しますか？`)) return;
+    if (!confirm(`No.${p.no}「${fullAddr(p)}」を削除しますか？`)) return;
     await dbDel(p.id); dropUrls(p.id); parcels = parcels.filter(x => x.id !== p.id);
     lastOrderKey = ''; renderList(); toast('削除しました');
   }
