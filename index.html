@@ -401,6 +401,13 @@ function bldLine(p){ return [p.bld, p.room].filter(Boolean).join(' '); }
 function fullAddr(p){ return [p.addr, p.bld, p.room].filter(Boolean).join(' '); }
 // 建物単位でまとめる：番地＋建物名が同じものは1グループ
 function groupKey(p){ return normKey(p.addr) + '|' + normKey(p.bld); }
+// 担当エリアの市区町村を省いて町名から表示（エリア外は市区町村から）
+function shortAddr(addr){
+  const a = toHalf(addr || '');
+  const hit = areas.filter(x => a.startsWith(x)).sort((x, y) => y.length - x.length)[0];
+  const rest = hit ? a.slice(hit.length) : a;
+  return rest || a;
+}
 function telHref(t){ return 'tel:' + String(t || '').replace(/[^0-9+]/g, ''); }
 const drafts = () => parcels.filter(p => p.draft).sort((a, b) => a.no - b.no);
 
@@ -601,7 +608,7 @@ function renderDeliver(){
         <div class="cnt">${n}個<small>${n > 1 ? '同じ建物' : 'No.' + first.no}</small></div>
       </div>
       <div class="body">
-        <div class="addr">${esc(first.addr)}${first.bld ? ' ' + esc(first.bld) : ''}</div>
+        <div class="addr">${esc(shortAddr(first.addr))}${first.bld ? ' ' + esc(first.bld) : ''}</div>
         ${n > 1 && roomSummary(g.items) ? `<div class="rooms">${roomSummary(g.items)}</div>` : ''}
         <div class="slides${n > 1 ? ' multi' : ''}" id="slides">${slides}</div>
         ${n > 1 ? `<div class="pager" id="pager">1 / ${n}　← スワイプで他の荷物 →</div>` : ''}
@@ -626,7 +633,7 @@ function renderDeliver(){
     const sub = (g.items.length > 1 ? `<b>${g.items.length}個</b> ` : '') + esc(names.slice(0, 3).join('・') + (names.length > 3 ? '…' : ''));
     return `<div class="row">
       ${ua ? `<img src="${ua}" alt="" data-view="${ua}">` : '<div class="ph"></div>'}
-      <div class="t"><div class="a">${esc(p.addr)}${p.bld ? ' ' + esc(p.bld) : ''}</div><div class="s">${sub || 'No.' + p.no}</div></div>
+      <div class="t"><div class="a">${esc(shortAddr(p.addr))}${p.bld ? ' ' + esc(p.bld) : ''}</div><div class="s">${sub || 'No.' + p.no}</div></div>
       <div class="d" data-dist="${g.id}">${dv}${du}</div>
     </div>`;
   }).join('');
@@ -1248,6 +1255,12 @@ function townOf(addr){
   const a = toHalf(addr || ''); const i = a.search(/\d/);
   return (i < 0 ? a : a.slice(0, i)).replace(/[-\s]+$/, '') || '';
 }
+// 見出しの地域名（町名まで）を省いた残り（番地）
+function afterTown(addr){
+  const a = toHalf(addr || ''), t = townOf(a);
+  const rest = t && a.startsWith(t) ? a.slice(t.length).replace(/^[-\s]+/, '') : a;
+  return rest || a;
+}
 function addrSortKey(addr){ return toHalf(addr || '').replace(/\d+/g, n => n.padStart(6, '0')); }
 function itemRow(p, kind, info, child){
   const u = kind === 'draft' ? blobUrl(p.id + ':a', p.photoAddr) : (blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr));
@@ -1257,7 +1270,7 @@ function itemRow(p, kind, info, child){
   const st = kind === 'draft' ? ` <span class="st ${ocrState(p)[1]}">${ocrState(p)[0]}</span>` : '';
   const title = child
     ? `${info.room ? esc(info.room) + ' ' : ''}${info.name ? esc(info.name) + ' 様' : '名前なし'}`
-    : (info.addr ? esc(info.addr) + (info.bld ? ' ' + esc(info.bld) : '') + (info.room ? ' ' + esc(info.room) : '') : '住所未入力');
+    : (info.addr ? esc(afterTown(info.addr)) + (info.bld ? ' ' + esc(info.bld) : '') + (info.room ? ' ' + esc(info.room) : '') : '住所未入力');
   const sub = child ? `No.${p.no}${st}${p.memo ? ' / ' + esc(p.memo) : ''}`
     : `No.${p.no}${st}${info.name ? ' ' + esc(info.name) : ''}${p.memo ? ' / ' + esc(p.memo) : ''}`;
   return `<div class="row">
@@ -1294,7 +1307,7 @@ function renderGrouped(list, kind){
     html += `<div class="grp">
       <div class="row head" data-grp="${esc(g.k)}">
         ${u ? `<img src="${u}" alt="" data-view="${u}">` : '<div class="ph"></div>'}
-        <div class="t"><div class="a">${esc(g.info.addr)}${g.info.bld ? ' ' + esc(g.info.bld) : ''}</div>
+        <div class="t"><div class="a">${esc(afterTown(g.info.addr))}${g.info.bld ? ' ' + esc(g.info.bld) : ''}</div>
           <div class="s">${ng ? `<span class="st ng">要確認 ${ng}件</span> ` : ''}${esc(names.slice(0, 3).join('・'))}${names.length > 3 ? '…' : ''}</div></div>
         <span class="cnt">${g.items.length}個</span><span class="chev">${open ? '▲' : '▼'}</span>
       </div>
