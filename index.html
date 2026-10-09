@@ -129,6 +129,21 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 .who a.tel{font-weight:800;color:var(--go);text-decoration:none;border:1.5px solid var(--go);border-radius:8px;padding:2px 9px;font-size:15px;font-variant-numeric:tabular-nums}
 .slide .one{margin-top:8px;border:2px solid var(--line);background:none;border-radius:8px;padding:8px;width:100%;font-weight:700;font-size:15px}
 .pager{text-align:center;font-size:13px;color:var(--sub);font-weight:700;margin-bottom:10px}
+.town{font-size:13px;font-weight:800;color:var(--sub);margin:14px 2px 4px;padding-bottom:2px;border-bottom:1px solid var(--line)}
+.grp{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:6px;overflow:hidden}
+.grp>.row{border:0;margin:0;border-radius:0}
+.grp .head{cursor:pointer}
+.grp .cnt{font-weight:800;font-size:13px;background:var(--ink);color:var(--card);border-radius:10px;padding:1px 8px;white-space:nowrap}
+.grp .chev{font-weight:800;color:var(--sub);width:16px;text-align:center}
+.grp .kids{border-top:1px dashed var(--line);padding:2px 6px 6px 18px}
+.grp .kids .row{border:0;border-bottom:1px solid var(--bg);border-radius:0;margin:0;padding:6px 2px}
+.grp .kids .row img,.grp .kids .row .ph{width:40px;height:40px}
+.cand{display:block;width:100%;text-align:left;margin-top:6px;border:2px solid var(--line);background:var(--card);border-radius:10px;padding:8px 10px;font-size:14px}
+.cand.on{border-color:var(--ink);box-shadow:inset 4px 0 0 var(--sign)}
+.cand .r{font-weight:800;font-size:12px;margin-right:6px}
+.cand .a{font-weight:700}
+.cand .s{font-size:12px;color:var(--sub)}
+.fixed{flex:none;align-self:center;font-weight:800;padding:0 4px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 .chip{font-size:13px;font-weight:700;padding:3px 9px;border-radius:12px;border:1.5px solid var(--line);background:var(--card)}
 .chip.ok{border-color:var(--go);color:var(--go)}
@@ -216,10 +231,14 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
       <input type="file" id="fileAddr" accept="image/*" hidden>
       <input type="file" id="filePkg" accept="image/*" hidden>
 
+      <div id="candBox" hidden>
+        <label class="f">伝票にあったほかの住所（タップで切り替え）</label>
+        <div id="candList"></div>
+      </div>
       <label class="f" for="addrIn">住所（丁目・番地まで）</label>
       <div class="in">
-        <span class="pre" id="prefixShow"></span>
-        <input type="text" id="addrIn" placeholder="緑区橋本3-1-1" enterkeyhint="search" autocomplete="off">
+        <span class="pre" id="prefixShow">神奈川県</span>
+        <input type="text" id="addrIn" placeholder="東林間8-6-19 または 座間市…" enterkeyhint="search" autocomplete="off">
         <button type="button" id="searchBtn">探す</button>
       </div>
       <div class="two" style="margin-top:0">
@@ -265,10 +284,20 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
     <h2 id="doneTitle">配達済み</h2>
     <div id="doneList"></div>
 
+    <h2 id="sampleTitle" hidden>読み間違いした伝票</h2>
+    <div id="sampleBox" hidden>
+      <p class="hint" id="sampleText"></p>
+      <div class="gap"></div>
+      <div class="two">
+        <button class="btn line sm" type="button" id="sampleShareBtn">写真を共有・保存</button>
+        <button class="btn line sm" type="button" id="sampleClearBtn">印を消す</button>
+      </div>
+    </div>
+
     <h2>設定</h2>
-    <label class="f" for="prefixIn">住所の前に自動で付ける文字</label>
-    <input type="text" id="prefixIn" placeholder="神奈川県相模原市">
-    <p class="hint">よく回るエリアの市区町村まで入れておくと、登録時は丁目・番地だけで済みます。</p>
+    <label class="f" for="areasIn">担当エリアの市区町村</label>
+    <div class="in"><span class="fixed">神奈川県</span><input type="text" id="areasIn" placeholder="相模原市南区、座間市"></div>
+    <p class="hint">「、」で区切って複数登録できます（都道府県は神奈川県で固定）。自動読み取りでは、この市区町村をお届け先の手がかりにし、エリア外の住所は「要確認」になります。先頭の市区町村は、番地だけを手入力したときに自動で付きます。</p>
     <div class="gap"></div><div class="gap"></div>
     <div class="two">
       <button class="btn line" type="button" id="clearDoneBtn">配達済みを削除</button>
@@ -301,23 +330,38 @@ const ls = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
 };
-let prefix = ls.get('prefix', '神奈川県相模原市');
+const PREF = '神奈川県';
+function parseAreas(t){
+  return toHalf(t || '').split(/[、,，\s]+/).map(x => x.replace(new RegExp('^' + PREF), '')).filter(Boolean).slice(0, 10);
+}
+const oldPrefix = ls.get('prefix', null);
+let areas = (() => {
+  const v = ls.get('areas', null);
+  if (v !== null) return parseAreas(v);
+  const o = oldPrefix ? oldPrefix.replace(/^神奈川県/, '') : '';
+  return o ? [o] : ['相模原市南区'];
+})();
+const defaultCity = () => areas[0] || '';
 let counter = parseInt(ls.get('counter', '0'), 10) || 0;
 
 /* ---------- IndexedDB ---------- */
-const DBN = 'chikai-nimotsu', ST = 'parcels';
+const DBN = 'chikai-nimotsu', ST = 'parcels', SS = 'samples';
 let db;
 function openDB(){
   return new Promise((res, rej) => {
-    const r = indexedDB.open(DBN, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore(ST, { keyPath: 'id' });
+    const r = indexedDB.open(DBN, 2);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if (!d.objectStoreNames.contains(ST)) d.createObjectStore(ST, { keyPath: 'id' });
+      if (!d.objectStoreNames.contains(SS)) d.createObjectStore(SS, { keyPath: 'id' });
+    };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
   });
 }
-function req(mode, fn){
+function req(mode, fn, store){
   return new Promise((res, rej) => {
-    const q = fn(db.transaction(ST, mode).objectStore(ST));
+    const q = fn(db.transaction(store || ST, mode).objectStore(store || ST));
     q.onsuccess = () => res(q.result);
     q.onerror = () => rej(q.error);
   });
@@ -325,6 +369,9 @@ function req(mode, fn){
 const dbAll = () => req('readonly', s => s.getAll());
 const dbPut = o => req('readwrite', s => s.put(o));
 const dbDel = id => req('readwrite', s => s.delete(id));
+const sampleAll = () => req('readonly', s => s.getAll(), SS);
+const samplePut = o => req('readwrite', s => s.put(o), SS);
+const sampleClear = () => req('readwrite', s => s.clear(), SS);
 function dbPutMany(list){
   return new Promise((res, rej) => {
     const t = db.transaction(ST, 'readwrite'), s = t.objectStore(ST);
@@ -769,11 +816,13 @@ function blobToBase64(blob){
 async function ocrOne(p){
   try {
     const image = await blobToBase64(p.photoAddr);
-    const r = await fetch(OCR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, type: 'image/jpeg' }) });
+    const r = await fetch(OCR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, type: 'image/jpeg', areas }) });
     const j = await r.json().catch(() => ({ ok: false, error: 'サーバーの応答が不正です' }));
     if (!j.ok) { p.ocr = { status: 'fail', error: j.error || ('HTTP ' + r.status) }; return j.error || ''; }
     p.ocr = { status: 'done', postal: j.postal, address: j.address, building: j.building, room: j.room || '',
-              name: j.name || '', tel: j.tel || '', confidence: j.confidence, postalMatch: j.postal_match, note: j.note };
+              name: j.name || '', tel: j.tel || '', confidence: j.confidence, postalMatch: j.postal_match, note: j.note,
+              candidates: j.candidates || [], chosen: j.chosen ?? 0, inArea: j.address ? inArea(j.address) : null,
+              retried: !!j.retried, switched: !!j.switched };
     if (j.address) {
       try {
         const c = await gsiSearch(buildQuery(j.address));
@@ -822,14 +871,15 @@ async function runOcr(list){
 // 確認なしで確定してよい条件：自信度high＋郵便番号一致＋番地まで位置特定
 function isSure(p){
   return p.draft && p.ocr && p.ocr.status === 'done' && p.ocr.address && p.ocr.confidence === 'high'
-    && p.ocr.postalMatch === true && p.lat != null && p.geo && p.geo.level === 'banchi';
+    && p.ocr.postalMatch === true && p.lat != null && p.geo && p.geo.level === 'banchi'
+    && p.ocr.inArea !== false && !p.ocr.switched;
 }
 function ocrState(p){
   if (!p.ocr) return ['未読み取り', ''];
   if (p.ocr.status === 'fail') return ['読み取り失敗', 'ng'];
   if (!p.ocr.address) return ['読み取れず', 'ng'];
   if (isSure(p)) return ['要確認なし', 'ok'];
-  if (p.ocr.confidence === 'low' || p.ocr.postalMatch === false || p.lat == null) return ['要確認', 'ng'];
+  if (p.ocr.confidence === 'low' || p.ocr.postalMatch === false || p.lat == null || p.ocr.inArea === false || p.ocr.switched) return ['要確認', 'ng'];
   return ['要確認', 'warn'];
 }
 function refreshOcrButtons(){
@@ -845,7 +895,7 @@ $('ocrPendingBtn').onclick = () => runOcr(drafts().filter(p => !p.ocr || p.ocr.s
 $('bulkOkBtn').onclick = async () => {
   const sure = drafts().filter(isSure);
   if (!sure.length) return;
-  if (!confirm(`自信度が高く、郵便番号と住所が一致し、番地まで位置が特定できた ${sure.length}件を確認なしで確定します。よろしいですか？`)) return;
+  if (!confirm(`自信度が高く、担当エリア内で、郵便番号と住所が一致し、番地まで位置が特定できた ${sure.length}件を確認なしで確定します。よろしいですか？`)) return;
   for (const p of sure) {
     p.addr = stripPrefix(p.ocr.address);
     p.bld = p.ocr.building || ''; p.room = p.ocr.room || '';
@@ -860,7 +910,7 @@ $('bulkOkBtn').onclick = async () => {
 };
 function stripPrefix(a){
   a = toHalf(a || '');
-  return a.startsWith(prefix) ? a.slice(prefix.length) : a;
+  return a.startsWith(PREF) ? a.slice(PREF.length) : a;
 }
 
 /* ---------- 登録フォーム ---------- */
@@ -924,9 +974,22 @@ async function onFile(input, which){
 $('fileAddr').onchange = e => onFile(e.target, 'a');
 $('filePkg').onchange = e => onFile(e.target, 'p');
 
+// 住所の文字から検索用の住所を作る（神奈川県は固定。市区町村がなければ担当エリアの先頭を補う）
+function hasPref(a){ return /^(東京都|北海道|京都府|大阪府|.{2,3}県)/.test(a); }
+function hasCity(a){ return /^[^\d\-]{1,10}?[市郡]/.test(a); }
 function buildQuery(raw){
   raw = toHalf(raw);
-  return raw.startsWith(prefix) || /^(東京都|北海道|京都府|大阪府|.{2,3}県)/.test(raw) ? raw : prefix + raw;
+  if (hasPref(raw)) return raw;
+  if (hasCity(raw)) return PREF + raw;
+  return PREF + defaultCity() + raw;
+}
+function inArea(full){
+  full = toHalf(full || '');
+  if (!full) return null;
+  if (hasPref(full) && !full.startsWith(PREF)) return false;
+  const body = full.replace(new RegExp('^' + PREF), '');
+  if (!areas.length) return true;
+  return areas.some(a => body.startsWith(a));
 }
 async function gsiSearch(q){
   const r = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(q));
@@ -973,6 +1036,7 @@ function resetForm(){
   showShot('a', null); showShot('p', null);
   $('addrIn').value = ''; $('bldIn').value = ''; $('roomIn').value = ''; $('nameIn').value = ''; $('telIn').value = ''; $('memoIn').value = ''; $('cands').innerHTML = '';
   $('ocrChips').hidden = true; $('reOcrBtn').hidden = true;
+  $('candBox').hidden = true; $('candList').innerHTML = ''; formCand = null;
   clearPin();
   $('saveBtn').textContent = '保存する';
   $('cancelEditBtn').hidden = true; $('draftBtns').hidden = true; $('draftBar').hidden = true;
@@ -998,7 +1062,8 @@ function loadDraft(p){
     $('bldIn').value = p.ocr.building || ''; $('roomIn').value = p.ocr.room || '';
     $('nameIn').value = p.ocr.name || ''; $('telIn').value = p.ocr.tel || '';
   }
-  renderChips(p);
+  formCand = null;
+  renderChips(p); renderCands(p);
   $('reOcrBtn').hidden = !p.photoAddr || ocrRunning;
   const rest = drafts().length;
   $('draftBar').hidden = false;
@@ -1006,6 +1071,36 @@ function loadDraft(p){
   $('saveBtn').textContent = '保存して次へ';
   $('draftBtns').hidden = false;
 }
+let formCand = null;
+function renderCands(p){
+  const cs = (p.ocr && p.ocr.status === 'done' && p.ocr.candidates) || [];
+  if (cs.length < 2) { $('candBox').hidden = true; $('candList').innerHTML = ''; return; }
+  const cur = formCand ?? p.ocr.chosen;
+  $('candList').innerHTML = cs.map((c, i) => {
+    const ar = c.in_area === true ? '<span class="chip ok">エリア内</span>' : c.in_area === false ? '<span class="chip ng">エリア外</span>' : '';
+    const roleCls = c.role === 'お届け先' ? 'ok' : c.role === 'ご依頼主' ? 'ng' : 'warn';
+    return `<button type="button" class="cand${i === cur ? ' on' : ''}" data-cand="${i}">
+      <span class="chip ${roleCls} r">${esc(c.role)}</span>${ar}${i === cur ? ' <b>✓ 選択中</b>' : ''}
+      <div class="a">${esc(stripPrefix(c.address))}${c.building ? ' ' + esc(c.building) : ''}${c.room ? ' ' + esc(c.room) : ''}</div>
+      <div class="s">${c.name ? esc(c.name) + (c.sama ? ' 様' : '') : '名前なし'}${c.tel ? ' ／ ' + esc(c.tel) : ''}</div>
+    </button>`;
+  }).join('');
+  $('candBox').hidden = false;
+}
+$('candList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-cand]'); if (!b) return;
+  const p = parcels.find(x => x.id === form.id); if (!p || !p.ocr) return;
+  const i = +b.dataset.cand, c = p.ocr.candidates[i]; if (!c) return;
+  formCand = i;
+  $('addrIn').value = stripPrefix(c.address);
+  $('bldIn').value = c.building || ''; $('roomIn').value = c.room || '';
+  $('nameIn').value = c.name || ''; $('telIn').value = c.tel || '';
+  renderCands(p);
+  try {
+    const r = await gsiSearch(buildQuery(c.address));
+    if (r.length) setPin(r[0].lat, r[0].lng); else { clearPin(); toast('位置が見つかりません。地図をタップして指定してください'); }
+  } catch(err) { toast('住所検索につながりません'); }
+});
 function renderChips(p){
   const c = [];
   if (!p.ocr) c.push(ocrRunning ? ['自動読み取り待ち', ''] : ['未読み取り', '']);
@@ -1014,6 +1109,10 @@ function renderChips(p){
   else {
     const cf = { high: ['自信度 高', 'ok'], medium: ['自信度 中', 'warn'], low: ['自信度 低', 'ng'] }[p.ocr.confidence] || ['自信度 不明', 'warn'];
     c.push(cf);
+    if (p.ocr.inArea === true) c.push(['担当エリア内', 'ok']);
+    else if (p.ocr.inArea === false) c.push(['担当エリア外', 'ng']);
+    if (p.ocr.switched) c.push(['エリア内の住所に切り替えました', 'ng']);
+    else if (p.ocr.retried) c.push(['読み直し済み', 'warn']);
     if (p.ocr.postalMatch === true) c.push(['〒一致', 'ok']);
     else if (p.ocr.postalMatch === false) c.push(['〒と住所が不一致', 'ng']);
     if (p.geo) {
@@ -1039,7 +1138,7 @@ function editParcel(id){
   const p = parcels.find(x => x.id === id); if (!p) return;
   showTab('register');
   if (p.draft) { loadDraft(p); return; }
-  fillForm(p);
+  fillForm(p); formCand = null; renderCands(p);
   $('saveBtn').textContent = `No.${p.no} を更新する`; $('cancelEditBtn').hidden = false;
 }
 function nextDraftAfter(no){
@@ -1072,13 +1171,14 @@ $('delDraftBtn').onclick = async () => {
 $('saveBtn').onclick = async () => {
   if (form.lat == null) { toast('届け先の位置を決めてください（探す・地図タップ・今いる場所）'); return; }
   const addrTxt = toHalf($('addrIn').value);
-  const addr = addrTxt ? (addrTxt.startsWith(prefix) ? addrTxt.slice(prefix.length) : addrTxt) : '住所未入力';
+  const addr = addrTxt ? stripPrefix(buildQuery(addrTxt)) : '住所未入力';
   const memo = $('memoIn').value.trim();
   const bld = toHalf($('bldIn').value), room = toHalf($('roomIn').value);
   const name = $('nameIn').value.trim(), tel = toHalf($('telIn').value);
   if (form.id) {
     const p = parcels.find(x => x.id === form.id);
     const wasDraft = !!p.draft;
+    await checkMisread(p, addr, name);
     Object.assign(p, { addr, bld, room, name, tel, memo, lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg, draft: false });
     dropUrls(p.id); await dbPut(p);
     if (wasDraft) { toast(`No.${p.no} を保存しました`); afterDraftDone(p.no); return; }
@@ -1096,31 +1196,134 @@ $('saveBtn').onclick = async () => {
   resetForm(); window.scrollTo(0, 0);
 };
 
+/* ---------- 読み間違いの記録 ---------- */
+async function checkMisread(p, addr, name){
+  if (!p.ocr || p.ocr.status !== 'done' || !p.photoAddr || p.misread) return;
+  const before = stripPrefix(p.ocr.address || '');
+  const changedCand = formCand != null && formCand !== p.ocr.chosen;
+  const changedAddr = normKey(before) !== normKey(addr);
+  const changedName = p.ocr.name && name && normKey(p.ocr.name) !== normKey(name);
+  if (!(changedCand || changedAddr || changedName || p.ocr.switched)) return;
+  p.misread = true;
+  try {
+    await samplePut({ id: p.id, no: p.no, photo: p.photoAddr, at: Date.now(), before, after: addr });
+  } catch(e) {}
+}
+async function renderSamples(){
+  let list = [];
+  try { list = await sampleAll(); } catch(e) {}
+  $('sampleTitle').hidden = !list.length; $('sampleBox').hidden = !list.length;
+  $('sampleTitle').textContent = `読み間違いした伝票 ${list.length}枚`;
+  $('sampleText').textContent = '自動読み取りの結果を手で直した伝票の写真です。チャットに送ってもらえると、読み取りの精度を上げる調整に使えます（写真はこのスマホの中だけに保存されています）。';
+}
+$('sampleShareBtn').onclick = async () => {
+  const list = await sampleAll();
+  if (!list.length) return;
+  const files = list.map((s, i) => new File([s.photo], `neardrop_sample_${String(i + 1).padStart(2, '0')}.jpg`, { type: 'image/jpeg' }));
+  try {
+    if (navigator.canShare && navigator.canShare({ files })) { await navigator.share({ files, title: 'NearDrop 読み間違いの伝票' }); return; }
+  } catch(e) { if (e && e.name === 'AbortError') return; }
+  for (const f of files) {
+    const url = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+    const a = document.createElement('a'); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    await new Promise(r => setTimeout(r, 300));
+  }
+  toast(`${files.length}枚を保存しました`);
+};
+$('sampleClearBtn').onclick = async () => {
+  if (!confirm('読み間違いの写真の記録を消しますか？（荷物の登録は消えません）')) return;
+  await sampleClear(); renderSamples(); toast('記録を消しました');
+};
+
 /* ---------- 一覧・設定 ---------- */
+const openGroups = new Set();
+function listInfo(p, kind){
+  if (kind === 'draft') {
+    const o = p.ocr && p.ocr.status === 'done' && p.ocr.address ? p.ocr : null;
+    return o ? { addr: stripPrefix(o.address), bld: o.building || '', room: o.room || '', name: o.name || '' } : { addr: '', bld: '', room: '', name: '' };
+  }
+  return { addr: p.addr && p.addr !== '住所未入力' ? p.addr : '', bld: p.bld || '', room: p.room || '', name: p.name || '' };
+}
+function townOf(addr){
+  const a = toHalf(addr || ''); const i = a.search(/\d/);
+  return (i < 0 ? a : a.slice(0, i)).replace(/[-\s]+$/, '') || '';
+}
+function addrSortKey(addr){ return toHalf(addr || '').replace(/\d+/g, n => n.padStart(6, '0')); }
+function itemRow(p, kind, info, child){
+  const u = kind === 'draft' ? blobUrl(p.id + ':a', p.photoAddr) : (blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr));
+  const btns = kind === 'done' ? `<button class="mini" data-undo="${p.id}">戻す</button>`
+    : kind === 'draft' ? `<button class="mini" data-edit="${p.id}">入力</button>`
+    : `<button class="mini" data-edit="${p.id}">編集</button><button class="mini" data-del="${p.id}">削除</button>`;
+  const st = kind === 'draft' ? ` <span class="st ${ocrState(p)[1]}">${ocrState(p)[0]}</span>` : '';
+  const title = child
+    ? `${info.room ? esc(info.room) + ' ' : ''}${info.name ? esc(info.name) + ' 様' : '名前なし'}`
+    : (info.addr ? esc(info.addr) + (info.bld ? ' ' + esc(info.bld) : '') + (info.room ? ' ' + esc(info.room) : '') : '住所未入力');
+  const sub = child ? `No.${p.no}${st}${p.memo ? ' / ' + esc(p.memo) : ''}`
+    : `No.${p.no}${st}${info.name ? ' ' + esc(info.name) : ''}${p.memo ? ' / ' + esc(p.memo) : ''}`;
+  return `<div class="row">
+    ${u ? `<img src="${u}" alt="" data-view="${u}">` : '<div class="ph"></div>'}
+    <div class="t"><div class="a">${title}</div><div class="s">${sub}</div></div>
+    ${btns}
+  </div>`;
+}
+function renderGrouped(list, kind){
+  if (!list.length) return '';
+  const m = new Map();
+  for (const p of list) {
+    const info = listInfo(p, kind);
+    const k = kind + '|' + (info.addr ? normKey(info.addr) + '|' + normKey(info.bld) : 'none:' + p.id);
+    if (!m.has(k)) m.set(k, { k, info, items: [] });
+    m.get(k).items.push({ p, info });
+  }
+  const groups = [...m.values()].sort((a, b) =>
+    (!a.info.addr) - (!b.info.addr) ||
+    addrSortKey(a.info.addr).localeCompare(addrSortKey(b.info.addr), 'ja') ||
+    normKey(a.info.bld).localeCompare(normKey(b.info.bld), 'ja') ||
+    a.items[0].p.no - b.items[0].p.no);
+  let html = '', lastTown = null;
+  for (const g of groups) {
+    const town = g.info.addr ? townOf(g.info.addr) : '住所未入力';
+    if (town !== lastTown) { html += `<div class="town">${esc(town)}</div>`; lastTown = town; }
+    if (g.items.length === 1) { html += `<div class="grp">${itemRow(g.items[0].p, kind, g.items[0].info, false)}</div>`; continue; }
+    g.items.sort((x, y) => String(x.info.room).localeCompare(String(y.info.room), 'ja', { numeric: true }) || x.p.no - y.p.no);
+    const open = openGroups.has(g.k);
+    const p0 = g.items[0].p;
+    const u = kind === 'draft' ? blobUrl(p0.id + ':a', p0.photoAddr) : (blobUrl(p0.id + ':p', p0.photoPkg) || blobUrl(p0.id + ':a', p0.photoAddr));
+    const names = g.items.map(x => (x.info.room ? x.info.room + ' ' : '') + (x.info.name || '')).filter(x => x.trim());
+    const ng = kind === 'draft' ? g.items.filter(x => ocrState(x.p)[1] === 'ng').length : 0;
+    html += `<div class="grp">
+      <div class="row head" data-grp="${esc(g.k)}">
+        ${u ? `<img src="${u}" alt="" data-view="${u}">` : '<div class="ph"></div>'}
+        <div class="t"><div class="a">${esc(g.info.addr)}${g.info.bld ? ' ' + esc(g.info.bld) : ''}</div>
+          <div class="s">${ng ? `<span class="st ng">要確認 ${ng}件</span> ` : ''}${esc(names.slice(0, 3).join('・'))}${names.length > 3 ? '…' : ''}</div></div>
+        <span class="cnt">${g.items.length}個</span><span class="chev">${open ? '▲' : '▼'}</span>
+      </div>
+      ${open ? `<div class="kids">${g.items.map(x => itemRow(x.p, kind, x.info, true)).join('')}</div>` : ''}
+    </div>`;
+  }
+  return html;
+}
 function renderList(){
   const dr = drafts();
-  const pend = parcels.filter(p => !p.done && !p.draft).sort((a, b) => a.no - b.no);
-  const done = parcels.filter(p => p.done).sort((a, b) => b.doneAt - a.doneAt);
+  const pend = parcels.filter(p => !p.done && !p.draft);
+  const done = parcels.filter(p => p.done);
   $('draftTitle').hidden = !dr.length; $('draftList').hidden = !dr.length;
   $('draftTitle').textContent = `住所の確認待ち ${dr.length}件`;
   $('pendTitle').textContent = `未配達 ${pend.length}件`;
   $('doneTitle').textContent = `配達済み ${done.length}件`;
-  const row = (p, kind) => {
-    const u = kind === 'draft' ? blobUrl(p.id + ':a', p.photoAddr) : (blobUrl(p.id + ':p', p.photoPkg) || blobUrl(p.id + ':a', p.photoAddr));
-    const btns = kind === 'done' ? `<button class="mini" data-undo="${p.id}">戻す</button>`
-      : kind === 'draft' ? `<button class="mini" data-edit="${p.id}">入力</button>`
-      : `<button class="mini" data-edit="${p.id}">編集</button><button class="mini" data-del="${p.id}">削除</button>`;
-    return `<div class="row">
-      ${u ? `<img src="${u}" alt="" data-view="${u}">` : '<div class="ph"></div>'}
-      <div class="t"><div class="a">${kind === 'draft' ? esc(p.ocr && p.ocr.address ? stripPrefix(p.ocr.address) + (p.ocr.building ? ' ' + p.ocr.building : '') + (p.ocr.room ? ' ' + p.ocr.room : '') : '住所未入力') : esc(fullAddr(p))}</div><div class="s">No.${p.no}${kind === 'draft' ? ` <span class="st ${ocrState(p)[1]}">${ocrState(p)[0]}</span>${p.ocr && p.ocr.name ? ' ' + esc(p.ocr.name) : ''}` : (p.name ? ' ' + esc(p.name) : '') + (p.memo ? ' / ' + esc(p.memo) : '')}</div></div>
-      ${btns}
-    </div>`;
-  };
-  $('draftList').innerHTML = dr.map(p => row(p, 'draft')).join('');
-  $('pendList').innerHTML = pend.length ? pend.map(p => row(p, 'pend')).join('') : '<p class="hint">未配達の荷物はありません。</p>';
-  $('doneList').innerHTML = done.length ? done.map(p => row(p, 'done')).join('') : '<p class="hint">まだありません。</p>';
+  $('draftList').innerHTML = renderGrouped(dr, 'draft');
+  $('pendList').innerHTML = pend.length ? renderGrouped(pend, 'pend') : '<p class="hint">未配達の荷物はありません。</p>';
+  $('doneList').innerHTML = done.length ? renderGrouped(done, 'done') : '<p class="hint">まだありません。</p>';
+  renderSamples();
   storageInfo();
 }
+$('tab-list').addEventListener('click', e => {
+  if (e.target.closest('button') || e.target.closest('[data-view]')) return;
+  const h = e.target.closest('[data-grp]'); if (!h) return;
+  const k = h.dataset.grp;
+  if (openGroups.has(k)) openGroups.delete(k); else openGroups.add(k);
+  renderList();
+});
 $('tab-list').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.edit) editParcel(b.dataset.edit);
@@ -1149,10 +1352,14 @@ $('clearAllBtn').onclick = async () => {
   resetForm(); updateBadge();
   lastOrderKey = ''; renderList(); toast('すべて削除しました');
 };
-$('prefixIn').value = prefix;
-$('prefixIn').addEventListener('change', () => {
-  prefix = toHalf($('prefixIn').value); ls.set('prefix', prefix);
-  $('prefixShow').textContent = prefix; toast('保存しました');
+$('areasIn').value = areas.join('、');
+$('areasIn').addEventListener('change', () => {
+  areas = parseAreas($('areasIn').value);
+  ls.set('areas', areas.join('、'));
+  $('areasIn').value = areas.join('、');
+  for (const p of parcels) if (p.ocr && p.ocr.status === 'done' && p.ocr.address) p.ocr.inArea = inArea(p.ocr.address);
+  refreshOcrButtons();
+  toast(areas.length ? '担当エリアを保存しました' : '担当エリアを空にしました（神奈川県全体）');
 });
 async function storageInfo(){
   try {
@@ -1165,11 +1372,19 @@ async function storageInfo(){
 
 /* ---------- 起動 ---------- */
 (async () => {
-  $('prefixShow').textContent = prefix;
   showShot('a', null); showShot('p', null);
   try {
     db = await openDB();
     parcels = await dbAll();
+    // 旧バージョン（「住所の前に付ける文字」を省いて保存していた住所）を市区町村付きに直す
+    if (oldPrefix && ls.get('migr3', '') !== '1') {
+      const city = oldPrefix.replace(/^神奈川県/, '');
+      for (const p of parcels) {
+        if (p.addr && p.addr !== '住所未入力' && !hasPref(p.addr) && !hasCity(p.addr) && city) { p.addr = city + p.addr; await dbPut(p); }
+      }
+      ls.set('migr3', '1');
+    }
+    if (ls.get('areas', null) === null) ls.set('areas', areas.join('、'));
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   } catch(e) {
     $('deliverTop').innerHTML = '<div class="empty"><b>保存領域を開けません。</b><br>シークレットモードを解除して開き直してください。</div>';
