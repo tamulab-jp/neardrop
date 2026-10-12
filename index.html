@@ -144,6 +144,8 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 .cand .a{font-weight:700}
 .cand .s{font-size:12px;color:var(--sub)}
 .fixed{flex:none;align-self:center;font-weight:800;padding:0 4px}
+.lines{flex-basis:100%;margin-top:4px;background:var(--card);border:1px dashed var(--line);border-radius:8px;padding:6px 10px;font-size:13px;font-family:ui-monospace,monospace}
+.lines b{display:block;font-family:inherit;font-size:11px;color:var(--sub)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 .chip{font-size:13px;font-weight:700;padding:3px 9px;border-radius:12px;border:1.5px solid var(--line);background:var(--card)}
 .chip.ok{border-color:var(--go);color:var(--go)}
@@ -326,6 +328,7 @@ const DEFAULT_CENTER = [35.5714, 139.3733]; // 相模原
 const NEAR_VIBRATE_M = 100;
 const OCR_ENDPOINT = 'https://jls-g.com/tools/neardrop/ocr.php';
 const OCR_PARALLEL = 3;
+const OCR_MAX = 1568; // 読み取りAIが受け付ける最大の大きさ（これ以上大きくしても縮められる）
 const ls = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
@@ -427,23 +430,23 @@ function fmt(m){
 }
 function toHalf(s){
   return s.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-          .replace(/[－ー―‐−]/g, '-').replace(/　/g, ' ').trim();
+          .replace(/[－―‐−]/g, '-').replace(/(\d)\s*ー\s*(?=\d)/g, '$1-').replace(/　/g, ' ').trim();
 }
 function hms(t){
   if (!t) return '';
   const d = new Date(t), z = n => String(n).padStart(2, '0');
   return `${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
 }
-function compress(file){
+function compress(file, max = 1280, quality = 0.75){
   return new Promise((res, rej) => {
     const u = URL.createObjectURL(file), img = new Image();
     img.onload = () => {
-      const max = 1280, s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement('canvas');
       c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(u);
-      c.toBlob(b => b ? res(b) : rej(new Error('圧縮に失敗しました')), 'image/jpeg', 0.75);
+      c.toBlob(b => b ? res(b) : rej(new Error('圧縮に失敗しました')), 'image/jpeg', quality);
     };
     img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('写真を読み込めませんでした')); };
     img.src = u;
@@ -717,7 +720,7 @@ $('fileBulk').onchange = async e => {
     try {
       const t = (await exifTime(f)) ?? nameTime(f.name) ?? f.lastModified;
       const blob = await compress(f);
-      items.push({ blob, t, name: f.name });
+      items.push({ blob, t, name: f.name, file: f });
     } catch(err) { failed++; }
   }
   items.sort((a, b) => (a.t - b.t) || a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -782,12 +785,16 @@ $('pcCancel').onclick = () => {
 $('pcOk').onclick = async () => {
   const list = [];
   const now = Date.now();
+  $('pcOk').disabled = true;
   for (let i = 0; i < imports.length; i += 2) {
+    $('pcTitle').textContent = `読み取り用の写真を準備中 ${i / 2 + 1} / ${Math.ceil(imports.length / 2)}`;
+    let ocrBlob = null;
+    try { ocrBlob = await compress(imports[i].file, OCR_MAX, 0.88); } catch(e) {}
     counter += 1;
     list.push({
       id: 'p' + now + '-' + i + Math.random().toString(36).slice(2, 5), no: counter,
       addr: '', memo: '', lat: null, lng: null,
-      photoAddr: imports[i].blob, photoPkg: imports[i + 1] ? imports[i + 1].blob : null,
+      photoAddr: imports[i].blob, photoPkg: imports[i + 1] ? imports[i + 1].blob : null, photoOcr: ocrBlob,
       done: false, draft: true, createdAt: now
     });
   }
@@ -820,23 +827,54 @@ function blobToBase64(blob){
     r.readAsDataURL(blob);
   });
 }
+async function callOcr(p, strong){
+  const image = await blobToBase64(p.photoOcr || p.photoAddr);
+  const r = await fetch(OCR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image, type: 'image/jpeg', areas, strong: !!strong }) });
+  const j = await r.json().catch(() => ({ ok: false, error: 'サーバーの応答が不正です' }));
+  if (!j.ok && !j.error) j.error = 'HTTP ' + r.status;
+  return j;
+}
+// 読み取った住所（と別の読み方）を地図で検索し、番地まで一致したものを選ぶ
+async function geoCheck(j){
+  const tries = [j.address, j.alt].filter(Boolean);
+  let best = null;
+  const rank = { banchi: 3, area: 2, mismatch: 1, none: 0, error: 0 };
+  for (const [i, a] of tries.entries()) {
+    let g;
+    try {
+      const c = await gsiSearch(buildQuery(stripPrefix(a)));
+      g = c.length ? { level: verifyGeo(a, c[0].title), title: c[0].title, lat: c[0].lat, lng: c[0].lng } : { level: 'none' };
+    } catch(e) { g = { level: 'error' }; }
+    g.addr = a; g.alt = i > 0;
+    if (!best || rank[g.level] > rank[best.level]) best = g;
+    if (g.level === 'banchi') break;
+  }
+  return best || { level: 'none', addr: j.address, alt: false };
+}
 async function ocrOne(p){
   try {
-    const image = await blobToBase64(p.photoAddr);
-    const r = await fetch(OCR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image, type: 'image/jpeg', areas }) });
-    const j = await r.json().catch(() => ({ ok: false, error: 'サーバーの応答が不正です' }));
-    if (!j.ok) { p.ocr = { status: 'fail', error: j.error || ('HTTP ' + r.status) }; return j.error || ''; }
-    p.ocr = { status: 'done', postal: j.postal, address: j.address, building: j.building, room: j.room || '',
-              name: j.name || '', tel: j.tel || '', confidence: j.confidence, postalMatch: j.postal_match, note: j.note,
-              candidates: j.candidates || [], chosen: j.chosen ?? 0, inArea: j.address ? inArea(j.address) : null,
-              retried: !!j.retried, switched: !!j.switched };
-    if (j.address) {
-      try {
-        const c = await gsiSearch(buildQuery(j.address));
-        if (c.length) { p.lat = c[0].lat; p.lng = c[0].lng; p.geo = { level: geoLevel(c[0].title), title: c[0].title }; }
-        else p.geo = { level: 'none' };
-      } catch(e) { p.geo = { level: 'error' }; }
+    let j = await callOcr(p, false);
+    if (!j.ok) { p.ocr = { status: 'fail', error: j.error }; return j.error; }
+    let g = j.address ? await geoCheck(j) : { level: 'none' };
+    // 番地まで確認できなければ、精度の高いモデルでもう一度読む
+    if (j.address === '' || g.level !== 'banchi') {
+      const j2 = await callOcr(p, true);
+      if (j2.ok && j2.address) {
+        const g2 = await geoCheck(j2);
+        const rank = { banchi: 3, area: 2, mismatch: 1, none: 0, error: 0 };
+        if (!j.address || rank[g2.level] >= rank[g.level]) { j = j2; g = g2; }
+      }
     }
+    const useAlt = !!(g && g.alt);
+    const chosenAddr = useAlt ? g.addr : j.address;
+    p.ocr = { status: 'done', postal: j.postal, address: chosenAddr, building: j.building, room: j.room || '',
+              name: j.name || '', tel: j.tel || '', confidence: j.confidence, postalMatch: j.postal_match, note: j.note,
+              candidates: j.candidates || [], chosen: j.chosen ?? 0, inArea: chosenAddr ? inArea(chosenAddr) : null,
+              retried: !!j.retried, strong: !!j.strong, switched: !!j.switched, lines: j.lines || [], altUsed: useAlt };
+    if (useAlt && p.ocr.candidates[p.ocr.chosen]) p.ocr.candidates[p.ocr.chosen].address = chosenAddr;
+    if (chosenAddr && g.lat != null) { p.lat = g.lat; p.lng = g.lng; }
+    p.geo = chosenAddr ? { level: g.level, title: g.title || '' } : null;
     return '';
   } catch(e) {
     p.ocr = { status: 'fail', error: '通信できませんでした' };
@@ -886,7 +924,7 @@ function ocrState(p){
   if (p.ocr.status === 'fail') return ['読み取り失敗', 'ng'];
   if (!p.ocr.address) return ['読み取れず', 'ng'];
   if (isSure(p)) return ['要確認なし', 'ok'];
-  if (p.ocr.confidence === 'low' || p.ocr.postalMatch === false || p.lat == null || p.ocr.inArea === false || p.ocr.switched) return ['要確認', 'ng'];
+  if (p.ocr.confidence === 'low' || p.ocr.postalMatch === false || p.lat == null || p.ocr.inArea === false || p.ocr.switched || (p.geo && p.geo.level === 'mismatch')) return ['要確認', 'ng'];
   return ['要確認', 'warn'];
 }
 function refreshOcrButtons(){
@@ -907,7 +945,7 @@ $('bulkOkBtn').onclick = async () => {
     p.addr = stripPrefix(p.ocr.address);
     p.bld = p.ocr.building || ''; p.room = p.ocr.room || '';
     p.name = p.ocr.name || ''; p.tel = p.ocr.tel || '';
-    p.draft = false;
+    p.draft = false; p.photoOcr = null;
     await dbPut(p); dropUrls(p.id);
   }
   lastOrderKey = '';
@@ -1005,9 +1043,27 @@ async function gsiSearch(q){
   return j.slice(0, 5).map(f => ({ lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], title: f.properties.title }));
 }
 // 検索結果が番地まで特定できているか（丁目・町名止まりなら area）
-function geoLevel(title){
-  const t = toHalf(title || '');
-  return /丁目\s*\d|\d+番|\d+-\d+|\d+$/.test(t) ? 'banchi' : 'area';
+function kan2num(k){
+  const d = { '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+  let n = 0, cur = 0;
+  for (const ch of k) { if (ch === '十') { n += (cur || 1) * 10; cur = 0; } else if (ch in d) cur = cur * 10 + d[ch]; }
+  return n + cur;
+}
+// 読み取った番地と、地図検索で見つかった住所の丁目・番地を比べる
+//  banchi＝番地まで一致 / area＝丁目までしか確認できない / mismatch＝数字が違う
+function verifyGeo(addr, title){
+  const m = toHalf(addr || '').match(/\d+(?:-\d+)*/);
+  const n = m ? m[0].split('-').map(Number) : [];
+  const t = toHalf(title || '').replace(/([〇一二三四五六七八九十]+)丁目/g, (_, k) => kan2num(k) + '丁目');
+  const c = t.match(/(\d+)丁目\s*(\d+)?/);
+  if (c) {
+    if (n[0] !== +c[1]) return 'mismatch';
+    if (!c[2]) return 'area';
+    return n[1] === +c[2] ? 'banchi' : 'mismatch';
+  }
+  const b = t.match(/(\d+)(?:番地?)?(?:-\d+)*\s*$/);
+  if (b) return n[0] === +b[1] ? 'banchi' : 'mismatch';
+  return 'area';
 }
 async function search(){
   const raw = toHalf($('addrIn').value);
@@ -1123,13 +1179,17 @@ function renderChips(p){
     if (p.ocr.postalMatch === true) c.push(['〒一致', 'ok']);
     else if (p.ocr.postalMatch === false) c.push(['〒と住所が不一致', 'ng']);
     if (p.geo) {
-      if (p.geo.level === 'banchi') c.push(['位置：番地まで', 'ok']);
-      else if (p.geo.level === 'area') c.push(['位置：丁目まで', 'warn']);
+      if (p.geo.level === 'banchi') c.push(['地図で番地まで一致', 'ok']);
+      else if (p.geo.level === 'area') c.push(['地図は丁目まで', 'warn']);
+      else if (p.geo.level === 'mismatch') c.push(['番地が地図と不一致', 'ng']);
       else c.push(['位置が見つかりません', 'ng']);
     }
+    if (p.ocr.altUsed) c.push(['改行のつなぎ方を変えて確認', 'warn']);
+    if (p.ocr.strong) c.push(['高精度モデルで読み直し', 'warn']);
     if (p.ocr.note) c.push([p.ocr.note, '']);
   }
-  $('ocrChips').innerHTML = c.map(([t, k]) => `<span class="chip ${k}">${esc(t)}</span>`).join('');
+  $('ocrChips').innerHTML = c.map(([t, k]) => `<span class="chip ${k}">${esc(t)}</span>`).join('')
+    + (p.ocr && p.ocr.lines && p.ocr.lines.length ? `<div class="lines"><b>伝票の書き写し</b>${p.ocr.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>` : '');
   $('ocrChips').hidden = false;
 }
 $('reOcrBtn').onclick = async () => {
@@ -1186,6 +1246,7 @@ $('saveBtn').onclick = async () => {
     const p = parcels.find(x => x.id === form.id);
     const wasDraft = !!p.draft;
     await checkMisread(p, addr, name);
+    p.photoOcr = null;
     Object.assign(p, { addr, bld, room, name, tel, memo, lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg, draft: false });
     dropUrls(p.id); await dbPut(p);
     if (wasDraft) { toast(`No.${p.no} を保存しました`); afterDraftDone(p.no); return; }
