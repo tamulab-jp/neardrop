@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1C2430">
+<meta name="theme-color" content="#4B3A7A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>NearDrop β</title>
@@ -30,8 +30,8 @@ button{cursor:pointer}
 :focus-visible{outline:3px solid var(--sign);outline-offset:2px}
 [hidden]{display:none !important}
 
-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--ink);color:#fff}
-@media (prefers-color-scheme:dark){header{background:#0E1318}}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#4B3A7A;color:#fff}
+@media (prefers-color-scheme:dark){header{background:#2E2350}}
 header h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.02em}
 #gps{font-size:13px;opacity:.85;font-variant-numeric:tabular-nums}
 #gps.bad{color:#FF9C8F;opacity:1}
@@ -154,24 +154,17 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 @media (prefers-color-scheme:dark){.chip.warn{color:#FFC93C;border-color:#FFC93C}}
 .row .st{font-size:12px;font-weight:800}
 .st.ok{color:var(--go)} .st.warn{color:#9A6A00} .st.ng{color:var(--stop)}
-.howto{margin-top:10px;background:var(--bg);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--sub)}
-.howto b{color:var(--ink)}
-.howto ol{margin:4px 0 6px;padding-left:20px}
-.pc-vid{grid-column:1/-1;display:flex;gap:6px;align-items:center}
-.pc-vid .mini{border:1px solid var(--line);background:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700}
-.pc-vid .vm{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
-.pc-no small{display:block;font-size:13px;font-weight:400}
-#repick{position:fixed;inset:0;background:var(--bg);z-index:1800;overflow-y:auto;padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(20px + env(safe-area-inset-bottom,0px));display:none}
-#repick.on{display:block}
-#repick .rp-in{max-width:640px;margin:0 auto}
-.rp-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0 4px}
-.rp-th{position:relative;aspect-ratio:1;border:3px solid var(--line);border-radius:8px;overflow:hidden;padding:0;background:var(--card)}
-.rp-th img{width:100%;height:100%;object-fit:cover;display:block}
-.rp-th.on{border-color:var(--go)}
-.rp-th .tm{position:absolute;left:3px;bottom:3px;background:rgba(28,36,48,.8);color:#fff;font-size:11px;padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums}
-.rp-th .ck{position:absolute;right:3px;top:3px;background:var(--go);color:#fff;font-size:12px;font-weight:800;border-radius:10px;padding:0 6px;display:none}
-.rp-th.on .ck{display:block}
 .pc-actions{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom,0px));background:var(--bg);padding:10px 0 4px}
+
+/* β：カメラ撮影まわり */
+.btn.sel.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.shots.camwide{grid-template-columns:1fr}
+.shots.camwide #shotAddr{aspect-ratio:5/2}
+.shots.camwide #shotPkg{aspect-ratio:4/3}
+.pic.small img,.pic.wide img{object-fit:contain;background:#000}
+.pic.wide{aspect-ratio:5/2}
+.spics.solo{grid-template-columns:1fr}
+.fullbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 
 /* overlays */
 #viewer{position:fixed;inset:0;background:rgba(0,0,0,.94);display:none;align-items:center;justify-content:center;z-index:2000;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
@@ -189,7 +182,7 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
 </head>
 <body>
 <header>
-  <h1>NearDrop β <small style="font-size:12px;opacity:.7">動画版 試験</small></h1>
+  <h1>NearDrop β</h1>
   <div id="gps">位置を取得中…</div>
 </header>
 
@@ -204,17 +197,12 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
   <!-- 登録 -->
   <section id="tab-register">
     <div class="import" id="importBox">
+      <button class="btn go" type="button" id="camBtn">📷 カメラで撮影</button>
+      <p class="hint">伝票のお届け先欄を枠に合わせて撮影します。撮るそばから、裏で住所を自動で読み取ります。荷物写真を撮るかどうかは「一覧」の設定で選べます。</p>
+      <div class="gap"></div>
       <button class="btn ink" type="button" id="importBtn">ギャラリーから一括取り込み</button>
-      <p class="hint">写真と動画の両方を選べます。写真は住所→荷物の順で撮ったものを撮影日時の順に2枚ずつペアに、動画は1本を荷物1個として扱い、住所を自動で読み取ります。</p>
-      <div class="howto">
-        <b>🎬 動画の撮り方（荷物1個につき1本・1〜2秒）</b>
-        <ol>
-          <li>伝票に寄って録画開始。伝票を画面いっぱいに映して<b>0.5秒止める</b></li>
-          <li>そのまま引いて荷物全体を映し、<b>0.5秒止めて</b>録画停止</li>
-        </ol>
-        動画はこのスマホの中だけで処理します（どこにも送りません）。保存するのは切り出した2コマだけです。
-      </div>
-      <input type="file" id="fileBulk" accept="image/*,video/*" multiple hidden>
+      <p class="hint">住所→荷物の順で撮った写真をまとめて選んでください。撮影日時の順に2枚ずつペアにして、住所を自動で読み取ります。</p>
+      <input type="file" id="fileBulk" accept="image/*" multiple hidden>
       <div id="importProg" hidden>
         <div class="prog"><i id="progBar"></i></div>
         <p class="hint" id="progText"></p>
@@ -244,7 +232,7 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
     <div id="formBox">
       <div class="draftbar" id="draftBar" hidden></div>
       <div class="chips" id="ocrChips" hidden></div>
-      <div class="shots">
+      <div class="shots" id="shotsBox">
         <div>
           <button class="shot" id="shotAddr" type="button"></button>
           <button class="chg" id="chgAddr" type="button" hidden>写真を変更</button>
@@ -255,6 +243,10 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
         </div>
       </div>
       <p class="hint" id="shotHint" hidden>写真をタップすると拡大できます。</p>
+      <div class="fullbtns" id="fullBtns" hidden>
+        <button class="btn line sm" type="button" id="viewFullBtn">伝票全体を見る</button>
+        <button class="btn line sm" type="button" id="reFullBtn">伝票全体で読み直す</button>
+      </div>
       <input type="file" id="fileAddr" accept="image/*" hidden>
       <input type="file" id="filePkg" accept="image/*" hidden>
 
@@ -325,6 +317,12 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
     <label class="f" for="areasIn">担当エリアの市区町村</label>
     <div class="in"><span class="fixed">神奈川県</span><input type="text" id="areasIn" placeholder="相模原市南区、座間市"></div>
     <p class="hint">「、」で区切って複数登録できます（都道府県は神奈川県で固定）。自動読み取りでは、この市区町村をお届け先の手がかりにし、エリア外の住所は「要確認」になります。先頭の市区町村は、番地だけを手入力したときに自動で付きます。</p>
+    <label class="f">荷物写真（カメラで撮影するとき）</label>
+    <div class="two">
+      <button class="btn line sm sel" type="button" id="pkgAlways">毎回撮る</button>
+      <button class="btn line sm sel" type="button" id="pkgNever">撮らない（伝票だけ）</button>
+    </div>
+    <p class="hint">「撮らない」にすると、1個につきシャッター1回で済みます。</p>
     <div class="gap"></div><div class="gap"></div>
     <div class="two">
       <button class="btn line" type="button" id="clearDoneBtn">配達済みを削除</button>
@@ -340,23 +338,11 @@ input[type=text]:focus,textarea:focus{border-color:var(--ink);outline:none}
   <button type="button" data-tab="list">一覧</button>
 </nav>
 
-<div id="repick"><div class="rp-in">
-  <div class="draftbar"><span id="rpTitle">コマを選び直す</span></div>
-  <p class="hint">くっきり度の高い順に並んでいます。タップして選び、「この選択にする」を押してください。</p>
-  <h2>伝票のコマ（動画の前半から）</h2>
-  <div class="rp-row" id="rpDoc"></div>
-  <h2>荷物全体のコマ（動画の後半から）</h2>
-  <div class="rp-row" id="rpPkg"></div>
-  <div class="gap"></div>
-  <button class="btn go" type="button" id="rpOk" disabled>この選択にする</button>
-  <div class="gap"></div>
-  <button class="btn line sm" type="button" id="rpCancel">キャンセル</button>
-</div></div>
 <div id="viewer"><img alt=""></div>
 <div id="toast"><span id="toastMsg"></span><button type="button" id="toastBtn" hidden>元に戻す</button></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="video-import.js"></script>
+<script src="camera.js"></script>
 <script>
 (() => {
 'use strict';
@@ -383,10 +369,10 @@ let areas = (() => {
   return o ? [o] : ['相模原市南区'];
 })();
 const defaultCity = () => areas[0] || '';
-let counter = parseInt(ls.get('beta_counter', '0'), 10) || 0;
+let counter = parseInt(ls.get('beta2_counter', '0'), 10) || 0;
 
 /* ---------- IndexedDB ---------- */
-const DBN = 'neardrop-beta', ST = 'parcels', SS = 'samples';
+const DBN = 'neardrop-beta2', ST = 'parcels', SS = 'samples';
 let db;
 function openDB(){
   return new Promise((res, rej) => {
@@ -433,7 +419,7 @@ function blobUrl(key, blob){
   return urlCache.get(key);
 }
 function dropUrls(id){
-  for (const k of [id + ':a', id + ':p']) {
+  for (const k of [id + ':a', id + ':p', id + ':f']) {
     if (urlCache.has(k)) { URL.revokeObjectURL(urlCache.get(k)); urlCache.delete(k); }
   }
 }
@@ -627,11 +613,12 @@ function renderDeliver(){
   const first = g.items[0];
   const slides = g.items.map((p, i) => {
     const up = blobUrl(p.id + ':p', p.photoPkg), ua = blobUrl(p.id + ':a', p.photoAddr);
+    const solo = !!(p.cam && !up && ua);
     return `<div class="slide">
-      <div class="spics">
+      ${solo ? `<div class="spics solo"><button class="pic wide" data-view="${ua}"><img src="${ua}" alt="住所の写真"><span>住所${n > 1 ? ' ' + (i + 1) : ''}</span></button></div>` : `<div class="spics">
         ${up ? `<button class="pic big" data-view="${up}"><img src="${up}" alt="荷物の写真"><span>荷物${n > 1 ? ' ' + (i + 1) : ''}</span></button>` : '<div class="pic big none">荷物写真なし</div>'}
         ${ua ? `<button class="pic small" data-view="${ua}"><img src="${ua}" alt="住所の写真"><span>住所</span></button>` : '<div class="pic small none">住所写真なし</div>'}
-      </div>
+      </div>`}
       <div class="who">
         ${p.room ? `<span class="rm">${esc(p.room)}</span>` : ''}
         <span class="nm">${p.name ? esc(p.name) + ' 様' : '<span style="color:var(--sub);font-size:15px">名前なし</span>'}</span>
@@ -750,82 +737,26 @@ $('fileBulk').onchange = async e => {
   $('importBtn').disabled = true;
   $('importProg').hidden = false;
   const items = [];
-  let failed = 0, vidFailed = 0, vidUnsupported = 0;
-  const nVid = files.filter(isVid).length;
-  let vidDone = 0;
+  let failed = 0;
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
-    if (isVid(f)) {
-      // 動画：1本ずつ順番に処理（終わるたびに動画のURLは解放される）
-      const label = `動画を処理中 ${vidDone + 1} / ${nVid}`;
-      $('progText').textContent = label;
-      $('progBar').style.width = (i / files.length * 100) + '%';
-      try {
-        const t = nameTime(f.name) ?? f.lastModified;
-        const r = await VideoImport.process(f, frac => {
-          $('progText').textContent = `${label}（${Math.round(frac * 100)}%）`;
-          $('progBar').style.width = ((i + frac) / files.length * 100) + '%';
-        });
-        items.push({ kind: 'vid', t, name: f.name, file: f, docBlob: r.docBlob, pkgBlob: r.pkgBlob, ocrBlob: r.ocrBlob,
-                     docT: r.docT, pkgT: r.pkgT, duration: r.duration, candDoc: r.candDoc, candPkg: r.candPkg });
-      } catch(err) {
-        vidFailed++;
-        if (err && err.code === 'unsupported') vidUnsupported++;
-      }
-      vidDone++;
-      continue;
-    }
     $('progText').textContent = `写真を読み込み中 ${i + 1} / ${files.length}`;
     $('progBar').style.width = ((i + 1) / files.length * 100) + '%';
     try {
       const t = (await exifTime(f)) ?? nameTime(f.name) ?? f.lastModified;
       const blob = await compress(f);
-      items.push({ kind: 'img', blob, t, name: f.name, file: f });
+      items.push({ blob, t, name: f.name, file: f });
     } catch(err) { failed++; }
   }
   items.sort((a, b) => (a.t - b.t) || a.name.localeCompare(b.name, undefined, { numeric: true }));
-  items.forEach(refreshItemUrls);
+  items.forEach(it => it.url = URL.createObjectURL(it.blob));
   imports = items;
   $('importBtn').disabled = false;
   $('importProg').hidden = true;
   if (failed) toast(`${failed}枚の写真を読み込めませんでした`);
-  if (vidFailed) {
-    alert(`${vidFailed}本の動画を処理できませんでした。` + (vidUnsupported
-      ? '\n\nこのChromeで再生できない形式（HEVC／高効率など）の可能性があります。スマホのカメラ設定を「互換性優先（H.264）」に変えて撮り直してください。'
-      : ''));
-  }
   if (!imports.length) return;
   openPairCheck();
 };
-const isVid = f => window.VideoImport && VideoImport.isVideo(f);
-function refreshItemUrls(it){
-  if (it.kind === 'vid') {
-    if (it.docUrl) URL.revokeObjectURL(it.docUrl);
-    if (it.pkgUrl) URL.revokeObjectURL(it.pkgUrl);
-    it.docUrl = URL.createObjectURL(it.docBlob);
-    it.pkgUrl = URL.createObjectURL(it.pkgBlob);
-  } else {
-    if (it.url) URL.revokeObjectURL(it.url);
-    it.url = URL.createObjectURL(it.blob);
-  }
-}
-function revokeItemUrls(it){
-  for (const k of ['url', 'docUrl', 'pkgUrl']) if (it[k]) { URL.revokeObjectURL(it[k]); it[k] = null; }
-}
-// 並べた順に「動画1本＝1組」「写真は2枚ずつ＝1組」として行を作る
-function buildRows(){
-  const rows = [];
-  let pend = null;
-  imports.forEach((it, i) => {
-    if (it.kind === 'vid') {
-      if (pend !== null) { rows.push({ type: 'img', a: pend }); pend = null; }
-      rows.push({ type: 'vid', i });
-    } else if (pend === null) pend = i;
-    else { rows.push({ type: 'img', a: pend, b: i }); pend = null; }
-  });
-  if (pend !== null) rows.push({ type: 'img', a: pend });
-  return rows;
-}
 function openPairCheck(){
   pairMode = true;
   $('importBox').hidden = true; $('formBox').hidden = true; $('pairCheck').hidden = false;
@@ -833,158 +764,45 @@ function openPairCheck(){
   window.scrollTo(0, 0);
 }
 function closePairCheck(){
-  imports.forEach(revokeItemUrls);
+  imports.forEach(it => URL.revokeObjectURL(it.url));
   imports = []; pairMode = false;
   $('pairCheck').hidden = true; $('importBox').hidden = false; $('formBox').hidden = false;
   setTimeout(() => map && map.invalidateSize(), 50);
 }
-function secTxt(t){ return (Math.round(t * 10) / 10).toFixed(1) + '秒'; }
 function renderPairs(){
-  const rows = buildRows();
-  const nImg = imports.filter(x => x.kind !== 'vid').length;
-  const nVid = imports.length - nImg;
-  const parts = [];
-  if (nImg) parts.push(`写真${nImg}枚`);
-  if (nVid) parts.push(`動画${nVid}本`);
-  const lonely = rows.some(r => r.type === 'img' && r.b === undefined);
-  $('pcTitle').textContent = `${parts.join('・')} → ${rows.length}件` + (lonely ? '（荷物の写真がない組があります）' : '');
+  const nPairs = Math.ceil(imports.length / 2);
+  const odd = imports.length % 2 === 1;
+  $('pcTitle').textContent = `${imports.length}枚 → ${nPairs}件` + (odd ? '（最後の1件は荷物の写真なし）' : '');
   let html = '';
-  rows.forEach((r, n) => {
-    if (r.type === 'vid') {
-      const it = imports[r.i];
-      html += `<div class="pc-row">
-        <div class="pc-no">${n + 1}<small>🎬</small></div>
-        <div class="pc-img"><img src="${it.docUrl}" alt="" loading="lazy" data-view="${it.docUrl}"><span class="tag">住所</span><span class="tm">${secTxt(it.docT)}</span><button class="x" type="button" data-xv="${r.i}" aria-label="この動画を外す">×</button></div>
-        <div class="pc-img"><img src="${it.pkgUrl}" alt="" loading="lazy" data-view="${it.pkgUrl}"><span class="tag">荷物</span><span class="tm">${secTxt(it.pkgT)}</span></div>
-        <button class="pc-sw" type="button" data-swv="${r.i}" aria-label="左右を入れ替え">⇄</button>
-        <div class="pc-vid"><button class="mini" type="button" data-rp="${r.i}">コマを選び直す</button><span class="vm">🎬 ${esc(it.name)}（${hms(it.t)}）</span></div>
-      </div>`;
-      return;
-    }
-    const a = imports[r.a], b = r.b !== undefined ? imports[r.b] : null;
+  for (let i = 0; i < imports.length; i += 2) {
+    const a = imports[i], b = imports[i + 1];
     html += `<div class="pc-row${b ? '' : ' warn'}">
-      <div class="pc-no">${n + 1}</div>
-      <div class="pc-img"><img src="${a.url}" alt="" loading="lazy" data-view="${a.url}"><span class="tag">住所</span><span class="tm">${hms(a.t)}</span><button class="x" type="button" data-x="${r.a}" aria-label="この写真を外す">×</button></div>
-      ${b ? `<div class="pc-img"><img src="${b.url}" alt="" loading="lazy" data-view="${b.url}"><span class="tag">荷物</span><span class="tm">${hms(b.t)}</span><button class="x" type="button" data-x="${r.b}" aria-label="この写真を外す">×</button></div>`
+      <div class="pc-no">${i / 2 + 1}</div>
+      <div class="pc-img"><img src="${a.url}" alt="" loading="lazy" data-view="${a.url}"><span class="tag">住所</span><span class="tm">${hms(a.t)}</span><button class="x" type="button" data-x="${i}" aria-label="この写真を外す">×</button></div>
+      ${b ? `<div class="pc-img"><img src="${b.url}" alt="" loading="lazy" data-view="${b.url}"><span class="tag">荷物</span><span class="tm">${hms(b.t)}</span><button class="x" type="button" data-x="${i + 1}" aria-label="この写真を外す">×</button></div>`
           : '<div class="pc-img">荷物の写真がありません</div>'}
-      ${b ? `<button class="pc-sw" type="button" data-sw="${r.a}" data-sw2="${r.b}" aria-label="左右を入れ替え">⇄</button>` : '<span></span>'}
+      ${b ? `<button class="pc-sw" type="button" data-sw="${i}" aria-label="左右を入れ替え">⇄</button>` : '<span></span>'}
     </div>`;
-  });
+  }
   $('pcList').innerHTML = html;
 }
 $('pcList').addEventListener('click', e => {
-  const xv = e.target.closest('[data-xv]');
-  if (xv) {
-    e.stopPropagation();
-    const i = +xv.dataset.xv;
-    revokeItemUrls(imports[i]);
-    imports.splice(i, 1);
-    if (!imports.length) { closePairCheck(); return; }
-    renderPairs(); return;
-  }
   const x = e.target.closest('[data-x]');
   if (x) {
     e.stopPropagation();
     const i = +x.dataset.x;
-    revokeItemUrls(imports[i]);
+    URL.revokeObjectURL(imports[i].url);
     imports.splice(i, 1);
     if (!imports.length) { closePairCheck(); return; }
     renderPairs(); return;
   }
-  const sv = e.target.closest('[data-swv]');
-  if (sv) {
-    // 動画の組：伝票のコマと荷物のコマを入れ替える（読み取り用の画像は作り直す）
-    swapVideoFrames(+sv.dataset.swv);
-    return;
-  }
-  const rpBtn = e.target.closest('[data-rp]');
-  if (rpBtn) { openRepick(+rpBtn.dataset.rp); return; }
   const s = e.target.closest('[data-sw]');
   if (s) {
-    const i = +s.dataset.sw, j = +s.dataset.sw2;
-    [imports[i], imports[j]] = [imports[j], imports[i]];
+    const i = +s.dataset.sw;
+    [imports[i], imports[i + 1]] = [imports[i + 1], imports[i]];
     renderPairs();
   }
 });
-async function swapVideoFrames(i){
-  const it = imports[i]; if (!it) return;
-  [it.docT, it.pkgT] = [it.pkgT, it.docT];
-  [it.docBlob, it.pkgBlob] = [it.pkgBlob, it.docBlob];
-  try {
-    const f = await VideoImport.docFrames(it.file, it.docT);
-    it.docBlob = f.docBlob; it.ocrBlob = f.ocrBlob;
-  } catch(err) { it.ocrBlob = null; }
-  refreshItemUrls(it);
-  renderPairs();
-}
-
-/* ---------- コマを選び直す（動画の組） ---------- */
-let rp = null; // { i, docSel, pkgSel, docTimes, pkgTimes, busy }
-async function openRepick(i){
-  const it = imports[i]; if (!it) return;
-  rp = { i, docSel: it.docT, pkgSel: it.pkgT, docTimes: it.candDoc.slice(), pkgTimes: it.candPkg.slice(), busy: false };
-  // 今選ばれているコマが候補になければ先頭に足す
-  if (!rp.docTimes.some(t => Math.abs(t - it.docT) < 0.001)) rp.docTimes.unshift(it.docT);
-  if (!rp.pkgTimes.some(t => Math.abs(t - it.pkgT) < 0.001)) rp.pkgTimes.unshift(it.pkgT);
-  $('rpTitle').textContent = `コマを選び直す：${it.name}`;
-  $('rpDoc').innerHTML = '<p class="hint">候補を読み込み中…</p>'; $('rpPkg').innerHTML = '';
-  $('rpOk').disabled = true;
-  $('repick').classList.add('on');
-  $('repick').scrollTop = 0;
-  const all = rp.docTimes.concat(rp.pkgTimes);
-  let blobs;
-  try { blobs = await VideoImport.thumbs(it.file, all, 480); }
-  catch(err) { toast('候補のコマを読み込めませんでした'); closeRepick(); return; }
-  if (!rp || rp.i !== i) return;
-  rp.docUrls = blobs.slice(0, rp.docTimes.length).map(b => b ? URL.createObjectURL(b) : null);
-  rp.pkgUrls = blobs.slice(rp.docTimes.length).map(b => b ? URL.createObjectURL(b) : null);
-  renderRepick();
-  $('rpOk').disabled = false;
-}
-function renderRepick(){
-  if (!rp) return;
-  const mk = (times, urls, sel, role) => times.map((t, k) => urls[k]
-    ? `<button type="button" class="rp-th${Math.abs(t - sel) < 0.001 ? ' on' : ''}" data-role="${role}" data-k="${k}"><img src="${urls[k]}" alt=""><span class="ck">✓</span><span class="tm">${secTxt(t)}</span></button>`
-    : '').join('');
-  $('rpDoc').innerHTML = mk(rp.docTimes, rp.docUrls, rp.docSel, 'doc');
-  $('rpPkg').innerHTML = mk(rp.pkgTimes, rp.pkgUrls, rp.pkgSel, 'pkg');
-}
-function closeRepick(){
-  if (rp) {
-    (rp.docUrls || []).concat(rp.pkgUrls || []).forEach(u => u && URL.revokeObjectURL(u));
-  }
-  rp = null;
-  $('repick').classList.remove('on');
-}
-$('repick').addEventListener('click', e => {
-  const b = e.target.closest('.rp-th'); if (!b || !rp) return;
-  const k = +b.dataset.k;
-  if (b.dataset.role === 'doc') rp.docSel = rp.docTimes[k]; else rp.pkgSel = rp.pkgTimes[k];
-  renderRepick();
-});
-$('rpCancel').onclick = closeRepick;
-$('rpOk').onclick = async () => {
-  if (!rp || rp.busy) return;
-  const it = imports[rp.i]; if (!it) { closeRepick(); return; }
-  rp.busy = true; $('rpOk').disabled = true; $('rpOk').textContent = 'コマを切り出し中…';
-  try {
-    if (Math.abs(rp.docSel - it.docT) > 0.001) {
-      const f = await VideoImport.docFrames(it.file, rp.docSel);
-      it.docBlob = f.docBlob; it.ocrBlob = f.ocrBlob; it.docT = rp.docSel;
-    }
-    if (Math.abs(rp.pkgSel - it.pkgT) > 0.001) {
-      it.pkgBlob = await VideoImport.frameAt(it.file, rp.pkgSel, 1280, 0.75); it.pkgT = rp.pkgSel;
-    }
-    refreshItemUrls(it);
-    closeRepick();
-    renderPairs();
-  } catch(err) {
-    toast('コマを切り出せませんでした');
-  } finally {
-    $('rpOk').textContent = 'この選択にする'; $('rpOk').disabled = false;
-    if (rp) rp.busy = false;
-  }
-};
 $('pcCancel').onclick = () => {
   if (!confirm('取り込みをやめますか？選んだ写真は登録されません。')) return;
   closePairCheck();
@@ -993,31 +811,22 @@ $('pcOk').onclick = async () => {
   const list = [];
   const now = Date.now();
   $('pcOk').disabled = true;
-  const rows = buildRows();
-  for (let n = 0; n < rows.length; n++) {
-    const r = rows[n];
-    $('pcTitle').textContent = `読み取り用の写真を準備中 ${n + 1} / ${rows.length}`;
-    let addrBlob, pkgBlob, ocrBlob = null, fromVideo = false;
-    if (r.type === 'vid') {
-      const it = imports[r.i];
-      addrBlob = it.docBlob; pkgBlob = it.pkgBlob; ocrBlob = it.ocrBlob; fromVideo = true;
-    } else {
-      const a = imports[r.a], b = r.b !== undefined ? imports[r.b] : null;
-      addrBlob = a.blob; pkgBlob = b ? b.blob : null;
-      try { ocrBlob = await compress(a.file, OCR_MAX, 0.88); } catch(e) {}
-    }
+  for (let i = 0; i < imports.length; i += 2) {
+    $('pcTitle').textContent = `読み取り用の写真を準備中 ${i / 2 + 1} / ${Math.ceil(imports.length / 2)}`;
+    let ocrBlob = null;
+    try { ocrBlob = await compress(imports[i].file, OCR_MAX, 0.88); } catch(e) {}
     counter += 1;
     list.push({
-      id: 'p' + now + '-' + n + Math.random().toString(36).slice(2, 5), no: counter,
+      id: 'p' + now + '-' + i + Math.random().toString(36).slice(2, 5), no: counter,
       addr: '', memo: '', lat: null, lng: null,
-      photoAddr: addrBlob, photoPkg: pkgBlob, photoOcr: ocrBlob,
-      done: false, draft: true, createdAt: now, fromVideo
+      photoAddr: imports[i].blob, photoPkg: imports[i + 1] ? imports[i + 1].blob : null, photoOcr: ocrBlob,
+      done: false, draft: true, createdAt: now
     });
   }
   $('pcOk').disabled = true;
   try {
     await dbPutMany(list);
-    ls.set('beta_counter', String(counter));
+    ls.set('beta2_counter', String(counter));
     parcels.push(...list);
   } catch(err) {
     counter -= list.length;
@@ -1043,10 +852,14 @@ function blobToBase64(blob){
     r.readAsDataURL(blob);
   });
 }
-async function callOcr(p, strong){
-  const image = await blobToBase64(p.photoOcr || p.photoAddr);
+async function callOcr(p, strong, opts){
+  opts = opts || {};
+  const useFull = !!(opts.full && p.photoFull);
+  const image = await blobToBase64(useFull ? p.photoFull : (p.photoOcr || p.photoAddr));
+  const body = { image, type: 'image/jpeg', areas, strong: !!strong };
+  if (p.cam && !useFull) body.mode = 'crop'; // カメラで枠に合わせて撮った切り抜き画像
   const r = await fetch(OCR_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image, type: 'image/jpeg', areas, strong: !!strong }) });
+    body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({ ok: false, error: 'サーバーの応答が不正です' }));
   if (!j.ok && !j.error) j.error = 'HTTP ' + r.status;
   return j;
@@ -1068,14 +881,14 @@ async function geoCheck(j){
   }
   return best || { level: 'none', addr: j.address, alt: false };
 }
-async function ocrOne(p){
+async function ocrOne(p, opts){
   try {
-    let j = await callOcr(p, false);
+    let j = await callOcr(p, false, opts);
     if (!j.ok) { p.ocr = { status: 'fail', error: j.error }; return j.error; }
     let g = j.address ? await geoCheck(j) : { level: 'none' };
     // 番地まで確認できなければ、精度の高いモデルでもう一度読む
     if (j.address === '' || g.level !== 'banchi') {
-      const j2 = await callOcr(p, true);
+      const j2 = await callOcr(p, true, opts);
       if (j2.ok && j2.address) {
         const g2 = await geoCheck(j2);
         const rank = { banchi: 3, area: 2, mismatch: 1, none: 0, error: 0 };
@@ -1087,7 +900,7 @@ async function ocrOne(p){
     p.ocr = { status: 'done', postal: j.postal, address: chosenAddr, building: j.building, room: j.room || '',
               name: j.name || '', tel: j.tel || '', confidence: j.confidence, postalMatch: j.postal_match, note: j.note,
               candidates: j.candidates || [], chosen: j.chosen ?? 0, inArea: chosenAddr ? inArea(chosenAddr) : null,
-              retried: !!j.retried, strong: !!j.strong, switched: !!j.switched, lines: j.lines || [], altUsed: useAlt };
+              retried: !!j.retried, strong: !!j.strong, switched: !!j.switched, lines: j.lines || [], altUsed: useAlt, fullRead: !!(opts && opts.full && p.photoFull) };
     if (useAlt && p.ocr.candidates[p.ocr.chosen]) p.ocr.candidates[p.ocr.chosen].address = chosenAddr;
     if (chosenAddr && g.lat != null) { p.lat = g.lat; p.lng = g.lng; }
     p.geo = chosenAddr ? { level: g.level, title: g.title || '' } : null;
@@ -1099,34 +912,59 @@ async function ocrOne(p){
     await dbPut(p);
   }
 }
-async function runOcr(list){
-  list = list.filter(p => p.draft && p.photoAddr);
-  if (!list.length || ocrRunning) return;
-  ocrRunning = true;
-  $('ocrProg').hidden = false; $('ocrPendingBtn').hidden = true; $('bulkOkBtn').hidden = true;
-  let done = 0, lastErr = '';
-  const queue = list.slice();
-  const tick = () => {
-    $('ocrText').textContent = `住所を自動で読み取り中 ${done} / ${list.length}`;
-    $('ocrBar').style.width = (done / list.length * 100) + '%';
-  };
-  tick();
-  const worker = async () => {
-    while (queue.length) {
-      const p = queue.shift();
-      const err = await ocrOne(p);
-      if (err) lastErr = err;
-      done++; tick();
-      if (form.id === p.id) loadDraft(p);
-      if (/上限|残高|キー/.test(err)) queue.length = 0;
-    }
-  };
-  await Promise.all(Array.from({ length: OCR_PARALLEL }, worker));
+// 読み取りの順番待ち（カメラで撮影を続けている間も、あとから追加できる）
+const ocrQueue = [];
+const ocrQueued = new Set();
+let ocrActive = 0, ocrTotal = 0, ocrDoneN = 0, ocrFailN = 0, ocrLastErr = '';
+function ocrTick(){
+  $('ocrText').textContent = `住所を自動で読み取り中 ${ocrDoneN} / ${ocrTotal}`;
+  $('ocrBar').style.width = (ocrTotal ? ocrDoneN / ocrTotal * 100 : 0) + '%';
+}
+function runOcr(list, opts){
+  list = list.filter(p => p.draft && p.photoAddr && !ocrQueued.has(p.id));
+  if (!list.length) return Promise.resolve();
+  return new Promise(resolve => {
+    let left = list.length;
+    const one = () => { if (--left === 0) resolve(); };
+    for (const p of list) { ocrQueued.add(p.id); ocrQueue.push({ p, opts: opts || {}, finish: one }); }
+    ocrTotal += list.length;
+    ocrRunning = true;
+    $('ocrProg').hidden = false; $('ocrPendingBtn').hidden = true; $('bulkOkBtn').hidden = true;
+    ocrTick();
+    pumpOcr();
+  });
+}
+function pumpOcr(){
+  while (ocrActive < OCR_PARALLEL && ocrQueue.length) {
+    const job = ocrQueue.shift();
+    ocrActive++;
+    (async () => {
+      let err = '';
+      try { err = await ocrOne(job.p, job.opts); } catch(e) { err = '通信できませんでした'; }
+      if (err) ocrLastErr = err;
+      if (job.p.ocr && job.p.ocr.status === 'fail') ocrFailN++;
+      ocrActive--; ocrQueued.delete(job.p.id); ocrDoneN++;
+      ocrTick(); camReadUpdate(job.p);
+      if (form.id === job.p.id) loadDraft(job.p);
+      if (/上限|残高|キー/.test(err)) {
+        // 上限・残高切れのときは、残りの読み取りを中止する
+        while (ocrQueue.length) { const j = ocrQueue.shift(); ocrQueued.delete(j.p.id); ocrTotal--; j.finish(); }
+      }
+      job.finish();
+      if (!ocrActive && !ocrQueue.length) finishOcr(); else pumpOcr();
+    })();
+  }
+}
+function finishOcr(){
   ocrRunning = false;
   $('ocrProg').hidden = true;
-  const failed = list.filter(p => p.ocr && p.ocr.status === 'fail').length;
-  toast(failed ? `読み取り完了（${failed}件は失敗：${lastErr}）` : '住所の自動読み取りが完了しました');
+  const failed = ocrFailN, err = ocrLastErr;
+  ocrTotal = ocrDoneN = ocrFailN = 0; ocrLastErr = '';
+  if (!(window.NearDropCamera && NearDropCamera.isOpen())) {
+    toast(failed ? `読み取り完了（${failed}件は失敗：${err}）` : '住所の自動読み取りが完了しました');
+  }
   refreshOcrButtons();
+  if (form.id) { const cp = parcels.find(x => x.id === form.id); if (cp && cp.draft) $('reOcrBtn').hidden = !cp.photoAddr; }
   if (currentTab === 'list') renderList();
 }
 // 確認なしで確定してよい条件：自信度high＋郵便番号一致＋番地まで位置特定
@@ -1161,7 +999,7 @@ $('bulkOkBtn').onclick = async () => {
     p.addr = stripPrefix(p.ocr.address);
     p.bld = p.ocr.building || ''; p.room = p.ocr.room || '';
     p.name = p.ocr.name || ''; p.tel = p.ocr.tel || '';
-    p.draft = false; p.photoOcr = null;
+    p.draft = false; p.photoOcr = null; p.photoFull = null;
     await dbPut(p); dropUrls(p.id);
   }
   lastOrderKey = '';
@@ -1172,6 +1010,62 @@ $('bulkOkBtn').onclick = async () => {
 function stripPrefix(a){
   a = toHalf(a || '');
   return a.startsWith(PREF) ? a.slice(PREF.length) : a;
+}
+
+/* ---------- アプリ内カメラ（camera.js） ---------- */
+let camReadN = 0;
+const camIds = new Set();
+function camReadUpdate(p){
+  if (camIds.has(p.id) && p.ocr && p.ocr.status === 'done') {
+    camIds.delete(p.id); camReadN++;
+    if (window.NearDropCamera) NearDropCamera.setRead(camReadN);
+  }
+}
+function pkgMode(){ return ls.get('beta2_pkgMode', 'always') === 'never' ? 'never' : 'always'; }
+function showPkgMode(){
+  const m = pkgMode();
+  $('pkgAlways').classList.toggle('on', m === 'always');
+  $('pkgNever').classList.toggle('on', m === 'never');
+}
+$('pkgAlways').onclick = () => { ls.set('beta2_pkgMode', 'always'); showPkgMode(); toast('荷物写真：毎回撮る'); };
+$('pkgNever').onclick = () => { ls.set('beta2_pkgMode', 'never'); showPkgMode(); toast('荷物写真：撮らない（伝票だけ）'); };
+showPkgMode();
+
+$('camBtn').onclick = () => {
+  if (pairMode) return;
+  if (!window.NearDropCamera) { toast('カメラの部品を読み込めませんでした。通信を確認して開き直してください'); return; }
+  camReadN = 0; camIds.clear();
+  NearDropCamera.open({
+    frameSize: ls.get('beta2_frameSize', 'm'),
+    pkgMode: pkgMode(),
+    onFrameSize: s => ls.set('beta2_frameSize', s),
+    onShot: onCamShot,
+    onClose: onCamClose
+  });
+};
+// 1個ぶん撮れるたびに「確認待ち」として保存し、すぐ裏で読み取りを始める
+async function onCamShot(item){
+  counter += 1; ls.set('beta2_counter', String(counter));
+  const p = {
+    id: 'p' + Date.now() + '-c' + Math.random().toString(36).slice(2, 6), no: counter,
+    addr: '', memo: '', lat: null, lng: null,
+    photoAddr: item.crop, photoFull: item.full, photoPkg: item.pkg, photoOcr: null,
+    done: false, draft: true, createdAt: item.at || Date.now(), cam: true
+  };
+  try {
+    await dbPut(p);
+  } catch(e) {
+    NearDropCamera.notify('保存できませんでした。空き容量を確認してください', 4000);
+    return;
+  }
+  parcels.push(p); camIds.add(p.id);
+  updateBadge();
+  runOcr([p]);
+}
+function onCamClose(){
+  updateBadge(); refreshOcrButtons();
+  if (!pairMode && !form.id && formIsEmpty()) { const d = drafts()[0]; if (d) loadDraft(d); }
+  if (currentTab === 'list') renderList();
 }
 
 /* ---------- 登録フォーム ---------- */
@@ -1314,7 +1208,7 @@ function resetForm(){
   form.id = null; form.photoAddr = null; form.photoPkg = null;
   showShot('a', null); showShot('p', null);
   $('addrIn').value = ''; $('bldIn').value = ''; $('roomIn').value = ''; $('nameIn').value = ''; $('telIn').value = ''; $('memoIn').value = ''; $('cands').innerHTML = '';
-  $('ocrChips').hidden = true; $('reOcrBtn').hidden = true;
+  $('ocrChips').hidden = true; $('reOcrBtn').hidden = true; $('fullBtns').hidden = true; $('shotsBox').classList.remove('camwide');
   $('candBox').hidden = true; $('candList').innerHTML = ''; formCand = null;
   clearPin();
   $('saveBtn').textContent = '保存する';
@@ -1322,6 +1216,7 @@ function resetForm(){
 }
 function fillForm(p){
   resetForm();
+  $('shotsBox').classList.toggle('camwide', !!p.cam);
   form.id = p.id; form.photoAddr = p.photoAddr; form.photoPkg = p.photoPkg;
   showShot('a', p.photoAddr); showShot('p', p.photoPkg);
   $('addrIn').value = p.addr || '';
@@ -1343,7 +1238,8 @@ function loadDraft(p){
   }
   formCand = null;
   renderChips(p); renderCands(p);
-  $('reOcrBtn').hidden = !p.photoAddr || ocrRunning;
+  $('reOcrBtn').hidden = !p.photoAddr || ocrQueued.has(p.id);
+  $('fullBtns').hidden = !p.photoFull;
   const rest = drafts().length;
   $('draftBar').hidden = false;
   $('draftBar').innerHTML = `<span>No.${p.no} の住所を確認</span><span>残り ${rest}件</span>`;
@@ -1402,6 +1298,7 @@ function renderChips(p){
     }
     if (p.ocr.altUsed) c.push(['改行のつなぎ方を変えて確認', 'warn']);
     if (p.ocr.strong) c.push(['高精度モデルで読み直し', 'warn']);
+    if (p.ocr.fullRead) c.push(['伝票全体で読み直し', 'warn']);
     if (p.ocr.note) c.push([p.ocr.note, '']);
   }
   $('ocrChips').innerHTML = c.map(([t, k]) => `<span class="chip ${k}">${esc(t)}</span>`).join('')
@@ -1410,11 +1307,25 @@ function renderChips(p){
 }
 $('reOcrBtn').onclick = async () => {
   const p = parcels.find(x => x.id === form.id);
-  if (!p || ocrRunning) return;
+  if (!p) return;
   $('reOcrBtn').disabled = true;
   p.ocr = null; renderChips(p);
   await runOcr([p]);
   $('reOcrBtn').disabled = false;
+  loadDraft(p);
+};
+$('viewFullBtn').onclick = () => {
+  const p = parcels.find(x => x.id === form.id);
+  if (p && p.photoFull) openViewer(blobUrl(p.id + ':f', p.photoFull));
+};
+// 住所が枠からはみ出していたときに、切り抜く前の伝票全体で読み直す
+$('reFullBtn').onclick = async () => {
+  const p = parcels.find(x => x.id === form.id);
+  if (!p || !p.photoFull) return;
+  $('reFullBtn').disabled = true;
+  p.ocr = null; renderChips(p);
+  await runOcr([p], { full: true });
+  $('reFullBtn').disabled = false;
   loadDraft(p);
 };
 function editParcel(id){
@@ -1462,7 +1373,7 @@ $('saveBtn').onclick = async () => {
     const p = parcels.find(x => x.id === form.id);
     const wasDraft = !!p.draft;
     await checkMisread(p, addr, name);
-    p.photoOcr = null;
+    p.photoOcr = null; p.photoFull = null;
     Object.assign(p, { addr, bld, room, name, tel, memo, lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg, draft: false });
     dropUrls(p.id); await dbPut(p);
     if (wasDraft) { toast(`No.${p.no} を保存しました`); afterDraftDone(p.no); return; }
@@ -1470,7 +1381,7 @@ $('saveBtn').onclick = async () => {
     resetForm(); lastOrderKey = ''; showTab('list');
     return;
   }
-  counter += 1; ls.set('beta_counter', String(counter));
+  counter += 1; ls.set('beta2_counter', String(counter));
   const p = { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), no: counter, addr, bld, room, name, tel, memo,
     lat: form.lat, lng: form.lng, photoAddr: form.photoAddr, photoPkg: form.photoPkg,
     done: false, draft: false, createdAt: Date.now() };
@@ -1631,14 +1542,14 @@ $('clearDoneBtn').onclick = async () => {
   if (!confirm(`配達済み ${done.length}件を削除しますか？`)) return;
   for (const p of done) { await dbDel(p.id); dropUrls(p.id); }
   parcels = parcels.filter(p => !p.done);
-  if (!parcels.length) { counter = 0; ls.set('beta_counter', '0'); }
+  if (!parcels.length) { counter = 0; ls.set('beta2_counter', '0'); }
   lastOrderKey = ''; renderList(); toast('配達済みを削除しました');
 };
 $('clearAllBtn').onclick = async () => {
   if (!parcels.length) { toast('登録された荷物はありません'); return; }
   if (!confirm(`未配達・住所未入力を含む ${parcels.length}件をすべて削除します。よろしいですか？`)) return;
   for (const p of parcels) { await dbDel(p.id); dropUrls(p.id); }
-  parcels = []; counter = 0; ls.set('beta_counter', '0');
+  parcels = []; counter = 0; ls.set('beta2_counter', '0');
   resetForm(); updateBadge();
   lastOrderKey = ''; renderList(); toast('すべて削除しました');
 };
@@ -1666,14 +1577,6 @@ async function storageInfo(){
   try {
     db = await openDB();
     parcels = await dbAll();
-    // 旧バージョン（「住所の前に付ける文字」を省いて保存していた住所）を市区町村付きに直す
-    if (oldPrefix && ls.get('beta_migr3', '') !== '1') {
-      const city = oldPrefix.replace(/^神奈川県/, '');
-      for (const p of parcels) {
-        if (p.addr && p.addr !== '住所未入力' && !hasPref(p.addr) && !hasCity(p.addr) && city) { p.addr = city + p.addr; await dbPut(p); }
-      }
-      ls.set('beta_migr3', '1');
-    }
     if (ls.get('areas', null) === null) ls.set('areas', areas.join('、'));
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   } catch(e) {
